@@ -27,7 +27,7 @@ liste$sing=NA
 donnf2=subset(donnf2,!is.na(elev)  & !is.na(temp_0_90))
 
 #defining temperature indice which are overlapping too much
-couples=data.frame(deb=rep(seq(0,365,15),3),fin= c(seq(0,365,15)+30,seq(0,365,15)+60,seq(0,365,15)+90))
+couples=data.frame(deb=rep(seq(0,365,15),2),fin= c(seq(0,365,15)+30,seq(0,365,15)+90))
 couples=subset(couples,deb<360)
 subs=matrix(TRUE,nrow(couples),nrow(couples))
 for (i in 1:nrow(couples)){
@@ -68,8 +68,25 @@ func=function(y){max(apply(subs,1,function(x)length(which(t(y) %in% t(x)))))}
 bidf$autor=apply(bidf,1,func)
 bidf=subset(bidf,autor<2)
 
+
+liste=as.data.frame(unique(donnf2[,c("Speciesgen","Species","FAMILLE","ORDRE")]))
+liste[,names(donnf2)[grep("temp",names(donnf2))]]=NA
+liste$rsq=NA
+liste$nb_pre1990=NA
+liste$nb_post1990=NA
+liste$nb=NA
+liste$inter=NA
+liste$sing=NA
+
+fwrite(liste,"liste_species_to_study.txt")
 fwrite(bidf,"combination_for_dredge.txt")
 fwrite(donnf2,"data_final.txt")
+
+for(i in 1:nrow(liste)){
+bidon=subset(donnf2,Speciesgen==liste$Speciesgen[i])
+fwrite(bidon,paste0("data_per_species/",liste$Speciesgen[i],".txt"))
+}
+
 #################################################
 library(data.table)
 library(dplyr)
@@ -87,23 +104,18 @@ args <- commandArgs(trailingOnly = TRUE)
 args_contents <- strsplit(args, ' ')
 # Get first argument
 i <- as.numeric(args_contents[[1]])
-i=1
+i=4
 
 nvariables=2
 
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 
+liste=fread("liste_species_to_study.txt")
 bidf=fread("combination_for_dredge.txt")
-donnf2=fread("data_final.txt")
-liste=as.data.frame(unique(donnf2[,c("Speciesgen","Species","FAMILLE","ORDRE")]))
-liste[,names(donnf2)[grep("temp",names(donnf2))]]=NA
-liste$rsq=NA
-liste$nb_pre1990=NA
-liste$nb_post1990=NA
-liste$nb=NA
-liste$inter=NA
-liste$sing=NA
+bidf=bidf[1:2,]
+bidon=fread("data_final.txt")[Speciesgen==liste$Speciesgen[i]]
+
 
 bidon=subset(donnf2,Speciesgen==liste$Speciesgen[i])
 bidon$maille=as.factor(bidon$maille)
@@ -112,43 +124,41 @@ a=0
 bidon$elev=(bidon$elev-mean(bidon$elev,na.rm=T))/1000
 dredgi=bidf
 dredgi$aicc=NA
+
 if(length(unique(bidon$maille))>1){
-dredgi=foreach(j=1:2,.combine=rbind)%dopar%{
+dredgi=foreach(j=1:nrow(bidf),.combine=rbind)%dopar%{
 varia=t(bidf)[1:nvariables,j][which(!is.na(t(bidf)[1:nvariables,j]))]
 form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
-"elev+(",paste(varia,collapse="+"),"1|maille)+(1|Annee)"))
-model=fitme(form,data=bidon)
+"+elev+(",paste(varia,collapse="+"),"+1|maille)+(1|Annee)"))
+model=lmer(form,data=bidon)
 return(cbind(bidf[j,],data.frame(aicc=extractAIC(model)[2])))
 }
 dredgi=dredgi[order(dredgi$aicc),]
 varia=t(dredgi)[1:nvariables,1][which(!is.na(t(dredgi)[1:nvariables,1]))]
 form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
-"elev+(",paste(varia,collapse="+"),"1|maille)+(1|Annee)"))
-dredgi=dredgi[order(dredgi$aicc),]
-varia=t(dredgi)[1:nvariables,1][which(!is.na(t(dredgi)[1:nvariables,1]))]
-form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
-"elev+(",paste(varia,collapse="+"),"1|maille)+(1|Annee)"))
-model=fitme(form,data=bidon)
+"+elev+(",paste(varia,collapse="+"),"+1|maille)+(1|Annee)"))
+model=lmer(form,data=bidon)
 }else{
 dredgi=foreach(j=1:nrow(bidf),.combine=rbind)%dopar%{
 varia=t(bidf)[1:nvariables,j][which(!is.na(t(bidf)[1:nvariables,j]))]
 form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
-"elev+(1|Annee)"))
-model=fitme(form,data=bidon)
+"+elev+(1|Annee)"))
+model=lmer(form,data=bidon)
 return(cbind(bidf[j,],data.frame(aicc=extractAIC(model)[2])))
 }
 dredgie=dredgi[order(dredgi$aicc),]
 varia=t(dredgi)[1:nvariables,1][which(!is.na(t(dredgi)[1:nvariables,1]))]
 form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
-"elev+(1|Annee)"))
-model=fitme(form,data=bidon)
+"+elev+(1|Annee)"))
+model=lmer(form,data=bidon)
 }
 bidon$resid=residuals(model)
 liste$rsq[i]=NA
-liste[i,names(model$fixef[-1])]=model$fixef[-1]
+vec=fixef(model)[grep("temp",names(fixef(model)))]
+liste[i,names(effet)]=effet
 liste$nb_pre1990[i]=nrow(subset(bidon,Annee<1990))
 liste$nb_post1990[i]=nrow(subset(bidon,Annee>=1990))
-liste$inter[i]=model$fixef[1]
+liste$inter[i]=fixef(model)[1]
 #if(length(unique(bidon$maille))>1){liste$sing[i]=isSingular(model)}else{liste$sing[i]=NA}
 }else{
 liste$rsq[i]=NA
@@ -157,6 +167,7 @@ liste$nb[i]=NA
 liste$inter[i]=NA
 liste$sing[i]=NA
 }
+
 
 fwrite(liste[i,],paste0(liste$Speciesgen[i],"_selec_temp.txt"),sep="\t")
 

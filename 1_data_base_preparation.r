@@ -43,11 +43,11 @@ donnf2=donnf2[donnf2$Speciesgen %in% b2$Speciesgen,]
 library(raster)
 library(sf)
 library(rgdal)
-setwd(dir="C:/Users/Francois/Documents/land use change/European_costlines")
+setwd(dir="D:/land use change/European_costlines")
 shp <- st_read(".", "Europe_coastline")
 e <- as(raster::extent(xmin,xmax,ymin,ymax), "SpatialPolygons") %>% 
   st_as_sf() %>% st_set_crs(4326) %>% st_transform(st_crs(shp))
-grd_lrg <- st_make_grid(e, cellsize = c(50000,50000))
+grd_lrg <- st_make_grid(e, cellsize = c(50000,50000)) 
 pts <- do.call(rbind,st_geometry(st_centroid(grd_lrg)))
 pts=as.data.frame(pts)
 names(pts)=c("ctr_lon","ctr_lat")

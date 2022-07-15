@@ -12,19 +12,16 @@ library(spaMM)
 library(sf)
 library(INLA)
 library(inlabru)
-library(e1071)
-setwd(dir="D:/land use change/European_costlines")
-shp <- st_read(".", "Europe_coastline")
 # setup parallel backend to use all available CPUs
-# ncpus <- as.numeric(Sys.getenv("SLURM_CPUS_PER_TASK"))
-# registerDoParallel(ncpus)
+ncpus <- as.numeric(Sys.getenv("SLURM_CPUS_PER_TASK"))
+registerDoParallel(ncpus)
 
-# # Collect command arguments
-# args <- commandArgs(trailingOnly = TRUE)
-# args_contents <- strsplit(args, ' ')
-# # Get first argument
-# i <- as.numeric(args_contents[[1]])
-# print(i)
+# Collect command arguments
+args <- commandArgs(trailingOnly = TRUE)
+args_contents <- strsplit(args, ' ')
+# Get first argument
+i <- as.numeric(args_contents[[1]])
+print(i)
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 liste=fread("selec_temp_var_beta.txt",sep="\t")
@@ -32,9 +29,6 @@ liste=subset(liste,nb_pre1990>=50 & nb_post1990>=500)
 vec=names(liste)[grep("temp",names(liste),fixed=T)]
 nb=liste[,c("Speciesgen","Species","FAMILLE","ORDRE","nb_pre1990","nb_post1990")]
 
-resf=NULL
-for(i in 1:nrow(liste)){
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",liste$Speciesgen[i],".txt"))
 bidon=subset(bidon, !is.na(temp_0_90))
 
@@ -45,60 +39,318 @@ bidon$Annee=bidon$Annee-1960
 bidon$maille_slope=bidon$maille
 varia=vec[which(!is.na(liste[i,vec,with=F]))]
 
-listevar=list(Annee = bidon$Annee,Annee2=bidon$Annee2,maille=bidon$maille,
-maille_slope=bidon$maille_slope,maille_slope1=bidon$maille_slope,maille_slope2=bidon$maille_slope,
+liste=list(Annee = bidon$Annee,Annee2=bidon$Annee2,maille=bidon$maille,maille_slope=bidon$maille_slope,maille_slope1=bidon$maille_slope,maille_slope2=bidon$maille_slope,
 maille_slope3=bidon$maille_slope,
 elev = bidon$elev)
-b=length(listevar)
-for(j in 1:length(varia)){
-listevar[j+b]=c(bidon[,paste(varia[j]),with=F])
-names(listevar)[j+b]=varia[j]
+b=length(liste)
+for(i in 1:length(varia)){
+liste[i+b]=c(bidon[,paste(varia[i]),with=F])
+names(liste)[i+b]=varia[i]
 }
 
 
-sfpts=sf::st_as_sf(bidon, coords = c("X","Y"),crs=st_crs(shp))
+dat=c(liste,list(Y=bidon$Jour.de.collecte,waypoint2=data_formodel$waypoint2,
+nbdays=data_formodel$nbdays,Ndata=nrow(bidon),N=nrow(data_formodel),
+plant_detect=data_formodel$final_plant_name2,
+bird_detect=data_formodel$hummingbird2,site_detect=data_formodel$site2,Year_detect=data_formodel$Year,Month_detect=data_formodel$Month,
+Nbirds=length(unique(data_formodel$hummingbird2)),Nsites=length(unique(data_formodel$site2)),visit_detect=data_formodel$visit,
+Nplants=length(unique(data_formodel$final_plant_name2)),nlv=7,Nelev=nrow(data_elev),
+NJ=length(unique(data_formodel$latent)),Ntemp=length(unique(data_formodel$index_month)),nu=3/2,a=c(10,10),b=c(1,1),Distance=as.matrix(Distance),
+phylo=phylo,Imat=Imat))
+
+save(dat,file=paste0("data_formodel_trait.RData"))
+
+######################################################################################################
+######################################################################################################
+#### JAGS model file written by runjags version 2.2.0-2 on 2021-11-23 15:22:45 
+######################################################################################################
+######################################################################################################
+
+### Model template as follows - ensure this is syntactically correct before running the model!
+
+model_string="
+model{
+
+# Process model
+for(i in 1:Ndata){
+	# Interaction mechanisms:
+	logit(lambda[visit[i]]) <- intercept +  * traitMatch1bis[i] + traitbarr[i]*traitbarrier + abund * abund_spbis[i]+
+	sum(inprod(lvcoef[hummingbird2[i],1:nlv],LV[latent[i],1:nlv]))+plant_effect[final_plant_name2[i]]+temp_effect[index_month[i]]+site_effect[hummingbird2[i],site2[i]]
+	L[visit[i]] <- lambda[visit[i]] * O[site2[i],hummingbird2[i]]
+	Z[visit[i]] ~ dbern(min(L[visit[i]]+0.00000000000000001,0.9999999999999999))
+}
+
+# Observation model
+ for(i in 1:N){
+	 logit(detect[i]) <- effect_hummingbird[bird_detect[i]]
+   Pi[i] <- min(detect[i]*Z[visit_detect[i]]+0.00000000000000001,0.9999999999999999)
+	 Y[i] ~ dbinom(Pi[i],nbdays[i])
+}
+
+# Latent variables
+for(j in 1:NJ) {
+    for(l in 1:nlv){
+      LV[j,l] ~ dnorm(0,1)
+    }
+}
+
+#phylogenetic signal
+epsilon[1:Nbirds] ~ dmnorm.vcov(rep(0,Nbirds),phylovariance * matvariance[,])
+for(j in 1:Nbirds){
+for(i in 1:Nbirds){
+matvariance[i,j] <- psignal*phylo[i,j]+(1-psignal)*Imat[i,j]
+}
+}
+psignal ~ dunif(0,1)
+phylovariance=sd.phylo * sd.phylo
+sd.phylo ~ dt(0, 1, 1)T(0,)
+
+#loading factors
+delta[1] ~ dgamma(a[1],b[1])
+rho[1]=delta[1]
+for(k in 2:nlv){
+delta[k] ~ dgamma(a[2],b[2])
+rho[k]=prod(delta[1:k])
+}
+
+
+for(j in 1:Nbirds){
+for(k in 1:nlv){
+lvcoef[j,k] ~ dnorm(0,taufac[j,k])
+taufac[j,k]=1/variance[j,k]
+variance[j,k]=(1/psi[j,k])*(1/rho[k])
+psi[j,k] ~ dgamma(nu,nu)
+}
+}
+
+# These lines give the prior distributions for the parameters to be estimated:
+abund ~ dnorm(0, 0.5) 
+traitMatch ~ dnorm(0, 0.5)
+traitbarrier ~ dnorm(0, 0.5)
+wingl ~ dnorm(0, 0.5)
+wingl2 ~ dnorm(0, 0.5)
+bodys ~ dnorm(0, 0.5)
+bodys2 ~ dnorm(0, 0.5)
+intercept_elev ~ dnorm(0, 0.5)
+elev1 ~ dnorm(0, 0.5)
+elev2 ~ dnorm(0, 0.5)
+
+
+#spatial autocorrelation:
+edec ~ dgamma(1, 2)
+for(j in 1:Nsites){
+for(i in 1:Nsites){
+D.covar[i,j] <- exp(-edec*Distance[i,j])
+}}
+
+
+# Observation model prior
+for(j in 1:Nbirds){
+effect_hummingbird[j] ~ dlogis(0, 1)
+inter_hummingbird[j] ~ dnorm(0, 0.5)
+site_effect[j,1:Nsites] ~ dmnorm.vcov(rep(0,Nsites), spatialvariance * D.covar[1:Nsites,1:Nsites])
+}
+spatialvariance=sd.site * sd.site
+sd.site ~ dt(0, 1, 1)T(0,)
+
+for(j in 1:Nplants){
+plant_effect[j] ~ dnorm(0, tau.plant)
+}
+tau.plant<- 1/(sd.plant * sd.plant)
+sd.plant ~ dt(0, 1, 1)T(0,)
+
+temp_effect[1] <- 0
+for(j in 2:Ntemp){
+temp_effect[j] ~ dnorm(temp_effect[j-1], tau.temp)
+}
+tau.temp<- 1/(sd.temp * sd.temp)
+sd.temp ~ dt(0, 1, 1)T(0,)
+
+}
+"
+
+writeLines(model_string,con="modeltrait.txt")
+
+ParsStage <- c("inter_hummingbird","traitMatch","abund","duration","effect_hummingbird","lvcoef","sd.site","sd.plant","intercept_elev",
+"elev1","elev2","LV","temp_effect","edec","plant_effect","traitbarrier","site_effect","sd.phylo","epsilon","wingl","wingl2","bodys","bodys2")
+
+#load("initial_conditions.RData")
+#Inits <- function(){lisf[[j]]}
+Inits <- function(){list()}
+
+results1 <- jags(model.file="modeltrait.txt", parameters.to.save=ParsStage, n.chains=1, data=dat,n.burnin = 30,  n.iter = 50, n.thin = 3,inits =Inits)
+
+
+
+save(results1,file=paste0("chain_model_modeltrait_",j,".RData"))
+#
+
+
+
+sfpts=sf::st_as_sf(bidon, coords = c('Longitude2','Latitude2'),crs=CRS("EPSG:4326"))
 spts=as(sfpts, "Spatial")
 
 # C-LM bounday as SpatialPolygons
-prdomain <- inla.nonconvex.hull(as.matrix(bidon[,c("X","Y")]), -0.03, -0.05, resolution = c(100, 100))
-if(nrow(bidon)<20000){clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(100000, 100000),cutoff=1)
-}else{
-clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(100000, 100000),cutoff=0.05)
+prdomain <- inla.nonconvex.hull(as.matrix(bidon[,c("Longitude2","Latitude2")]), -0.03, -0.05, resolution = c(100, 100))
+clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(15, 50),
+  offset = c(10, 10))
+inla.mesh2sp <- function(mesh) {
+crs <- inla.CRS(inla.CRSargs(mesh$crs))
+isgeocentric <- identical(inla.as.list.CRS(crs)[["proj"]], "geocent")
+if (isgeocentric || (mesh$manifold == "S2")) {
+stop(paste0(
+"'sp' doesn't support storing polygons in geocentric coordinates.\n",
+"Convert to a map projection with inla.spTransform() before
+calling inla.mesh2sp().")) 
 }
+
+triangles <- SpatialPolygonsDataFrame(
+Sr = SpatialPolygons(lapply(
+1:nrow(mesh$graph$tv),
+function(x) {
+tv <- mesh$graph$tv[x, , drop = TRUE]
+Polygons(list(Polygon(mesh$loc[tv[c(1, 3, 2, 1)],
+1:2,
+drop = FALSE])),
+ID = x)
+}
+),
+proj4string = crs
+),
+data = as.data.frame(mesh$graph$tv[, c(1, 3, 2), drop = FALSE]),
+match.ID = FALSE
+)
+vertices <- SpatialPoints(mesh$loc[, 1:2, drop = FALSE], proj4string = crs)
+
+list(triangles = triangles, vertices = vertices)
+} 
+
+obj=inla.mesh2sp(clm.mesh)
+obj2=st_as_sf(obj$triangles)
+
 
 par(mar = c(0, 0, 0, 0))
 plot(clm.mesh, asp = 1, main = "")
-xmin=-11
-xmax=2.3
-ymin=49.9
-ymax=59.6
-e <- as(raster::extent(xmin,xmax,ymin,ymax), "SpatialPolygons") %>% 
-  st_as_sf() %>% st_set_crs(4326) %>% st_transform(st_crs(shp))
-grd_lrg <- st_make_grid(e, cellsize = c(50000,50000))
-plot(grd_lrg,add=T)
-
+lines(prdomain, col = 3, with = 2)  
   
-A <- inla.spde.make.A(clm.mesh, loc = as.matrix(bidon[,c("X","Y")]))
+A <- inla.spde.make.A(clm.mesh, loc = as.matrix(bidon[,c("Longitude2","Latitude2")]))
 
 spde <- inla.spde2.matern(clm.mesh, alpha = 2)
 mesh.index <- inla.spde.make.index(name = "field", n.spde = spde$n.spde)
-stk.dat <- inla.stack(data = list(y = bidon$Jour.de.collecte), A = list(A, 1), tag = "est", effects = list(c(list(Intercept=1),mesh.index),
-listevar))
-f.s=formula(paste0("y~-1+",paste(varia,collapse="+"),
+stk.dat <- inla.stack(data = list(y = bidon$Jour.de.collecte), A = list(A, 1), tag = "est", effects = list(c(mesh.index),
+liste))
+f.s <- y ~  elev+Annee +f(maille, model = "iid")+f(Annee2, model = "iid")+ f(field, model = spde)
+f.s=formula(paste0("y~",paste(varia,collapse="+"),
 "+elev+Annee+f(maille,model = 'iid')+f(maille_slope,Annee,model = 'iid')+",paste(paste0("f(maille_slope",c(1:length(varia)),",",varia,",model='iid')"),collapse="+"),
-"+f(field,model=spde)+f(Annee2,model='ar1')"))
-model <- inla(f.s, family = "gaussian", data = inla.stack.data(stk.dat), verbose = TRUE, 
+"+f(field, model = spde)+f(Annee2,model='rw1')"))
+r.s <- inla(f.s, family = "gaussian", data = inla.stack.data(stk.dat), verbose = TRUE, 
     control.predictor = list(A = inla.stack.A(stk.dat), compute = TRUE))
-	
+
+
+r.f <- inla.spde2.result(r.s, "field", spde, do.transf = TRUE)
+#extract site intercept:
+head(r.f$summary.values)
+
+obj2$value=r.f$summary.values$mean
+
+inla.emarginal(function(x) x, r.f$marginals.variance.nominal[[1]])
+
+
+
+bidon=cbind(bidon,clm.mesh$loc[clm.mesh$idx$loc, 1:2])
+
+spde1 <- inla.spde2.pcmatern(clm.mesh, prior.range = c(100e3, 0.5),
+prior.sigma = c(0.9, 0.05))
+
+form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+elev+Annee+f(maille, model = 'iid')+",paste(paste0("f(maille,",varia,",model='iid')"),collapse="+"),
+"+f(field, model = spde)+f(Annee2,model='rw1')"))
+t1=Sys.time()
+bru_spde1 <- bru(form,family = "gaussian", data = sfpts)
+t2=Sys.time()
+t2-t1
+
+form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+elev+Annee+(1+",paste(varia,collapse="+"),"+Annee","|maille)"))
+model2=lmer(form,data=bidon)
+
+bidon$pos <- numFactor(bidon$Longitude2, bidon$Latitude2)
+bidon$group <- factor(rep(1, nrow(bidon)))
+bidon$times <- numFactor(bidon$Annee2)
+form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+elev+Annee+(1+",paste(varia,collapse="+"),"+Annee","|maille)+ou(times + 0 | group)+exp(pos + 0 | group)"))
+model2=glmmTMB(form,data=bidon)
+
+
+clm.spde <- inla.spde2.pcmatern(mesh = clm.mesh, alpha = 2,
+  prior.range = c(50, 0.9), # P(range < 50) = 0.9
+  prior.sigma = c(1, 0.01) # P(sigma > 10) = 0.01
+)
+
+library("deldir")
+library("SDraw")
+ 
+# Voronoi polygons (as SpatialPolygons)
+mytiles <- voronoi.polygons(SpatialPoints(clm.mesh$loc[, 1:2]))
+
+
+
+#Compute weights
+require(rgeos)
+
+w <- sapply(1:length(mytiles), function(p) {
+  aux <- mytiles[p, ]  
+
+  if(gIntersects(aux, clmbdy.sp) ) {
+    return(gArea(gIntersection(aux, clmbdy.sp)))
+  } else {
+    return(0)
+  }
+})
+
+# Number of vertices in the mesh
+nv <- clm.mesh$n
+# Number of points in the data
+n <- nrow(spts)
+#Prepare data
+y.pp = rep(0:1, c(nv, n))
+e.pp = c(w, rep(0, n))
+
+lmat <- inla.spde.make.A(clm.mesh, spts)
+imat <- Diagonal(nv, rep(1, nv))
+
+A.pp <-rbind(imat, lmat)
+
+clm.spde.index <- inla.spde.make.index(name = "spatial.field",
+  n.spde = clm.spde$n.spde)
+  
+
+
+f(ID, model = "matern2d", nrow = 5, ncol = 10)
+
+if(length(unique(bidon$maille))>1){
+form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+elev+Annee+(1+",paste(varia,collapse="+"),"+Annee","|maille)+(1|Annee)+Matern(1 | Longitude2 + Latitude2)"))
+model=fitme(form,data=bidon)
+}else{
+form=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+elev+Annee+(1|Annee)+Matern(1 | Longitude2 + Latitude2)"))
+model=fitme(form,data=bidon)
+}
+
 save(model,file=paste0("model_",liste$Speciesgen[i],".RData"))
+
+
 	
-bidon$resid=bidon$Jour.de.collecte-model$summary.fitted.values$mean[grep("APredictor",rownames(model$summary.fitted.values),fixed=T)]
-res=as.data.frame(model$summary.fixed)
+bidon$resid=residuals(model)
+pl1=ggplot(data=bidon,aes(x=X,y=Y,color=sqrt(abs(resid))*sign(resid)))+
+geom_point(size=2)+scale_color_viridis()
+res=as.data.frame(summary(model)$beta_table)
 res$varia=rownames(res)
 res$core=NA
 res$core[res$varia %in% varia]=t(cor(bidon[,c("Annee",varia),with=F])[-1,1])
 res$Var=NA
-res$Var[res$varia %in% rownames(model$summary.hyperpar)]=model$summary.hyperpar$mean
+res$Var[res$varia %in% summary(model)$lambda_table$Term]=summary(model)$lambda_table$Var
 res$Speciesgen=liste$Speciesgen[i]
 res$latmean=mean(bidon$Y)
 res$longmean=mean(bidon$X)
@@ -111,17 +363,49 @@ bidon$Annee2=plyr::round_any(bidon$Annee,2)
 b=bidon %>% dplyr::group_by(Speciesgen,Annee2) %>% dplyr::summarise(skew=skewness(resid),nbd=length(resid),
 kurt=kurtosis(resid))
 modelskew=lm(skew~Annee2,data=b,weights=sqrt(nbd))
-res$trend_skew=NA
 res$trend_skew=modelskew$coeff[2]
 res$trend_skew_err=summary(modelskew)$coeff[2,2]
 modelkurt=lm(kurt~Annee2,data=b,weights=sqrt(nbd))
 res$trend_kurt=modelkurt$coeff[2]
 res$trend_kurt_err=summary(modelkurt)$coeff[2,2]
 
-resf=rbind(resf,res)
+resqual=bidon %>% dplyr::group_by(Speciesgen,Species,FAMILLE,ORDRE,maille,ctr_lon,ctr_lat) %>%
+dplyr::summarise(n=n())
+if(length(unique(bidon$maille))>1){bibi=as.data.frame(ranef(model)[[1]])
+}else{bibi=as.data.frame(matrix(0,1,length(varia)+2))}
+bibi=bibi+do.call("rbind",replicate(nrow(bibi),as.data.frame(res$Estimate[res$varia %in% colnames(ranef(model)[[1]])]),
+))
+if(length(unique(bidon$maille))>1){
+for(j in varia){
+mod=fitme(formula(paste0(j,"~Annee+(Annee","|maille)")),
+data=unique(bidon[,c("Annee","latitude","longitude","maille",j),with=F]))
+res$trend[res$varia==j]=mod$fixef[2]
+bibi1=as.data.frame(ranef(mod)[[1]][,2])+mod$fixef[2]
+names(bibi1)=paste0("trend_",j)
+bibi=cbind(bibi,bibi1)
+}
+}else{
+for(j in varia){
+mod=lm(formula(paste0(j,"~Annee")),
+data=unique(bidon[,c("Annee","latitude","longitude",j),with=F]))
+res$trend[res$varia==j]=mod$coeff[2]
+}
 }
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+bibi$maille=as.numeric(rownames(bibi))
+resqual=merge(resqual,bibi,by="maille")
+print(ggplot(data=resqual,aes(x=ctr_lon,y=ctr_lat,col=Annee,size=n))+geom_point()+scale_color_gradient2())
+resqual=melt(resqual,id.vars=c("Speciesgen","Species","FAMILLE","ORDRE","maille","ctr_lon","ctr_lat","n"))
+if(i==1){
+resf=res
+resqualf=resqual
+}else{
+resf=rbind(resf,res)
+resqualf=rbind(resqualf,resqual)
+}
+
+setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/data")
+fwrite(resqualf,"plast_adapt_par_maille.txt",sep="\t")
 fwrite(resf,"plast_adapt.txt",sep="\t")
 
 ######################################
