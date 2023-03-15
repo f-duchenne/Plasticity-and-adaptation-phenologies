@@ -156,32 +156,36 @@ b2$variable=factor(b2$variable,levels=c("Estimate from Ramakers et al.\n(bivaria
 b2$varia[b2$type=="plasticity"]="1973-2016"
 
 
-pl1=ggplot(data=subset(b2,type=="evolution of the reaction norm intercept"),aes(x=variable,y=mean,color=varia))+geom_point()+
+pl1=ggplot(data=subset(b2,type=="evolution of the reaction norm intercept"),aes(x=variable,y=mean,color=varia))+
+geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
 geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("a")+
 theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Evolution of the reaction norm intercept (days)")+
-geom_hline(yintercept=0,linetype="dashed")+coord_flip()+labs(color="Period on which changes are integrated:")+
+coord_flip()+labs(color="Period on which changes are integrated:")+
 scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
 
-pl2=ggplot(data=subset(b2,type=="plasticity"),aes(x=variable,y=mean,color=varia))+geom_point()+
+pl2=ggplot(data=subset(b2,type=="plasticity"),aes(x=variable,y=mean,color=varia))+
+geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
 geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("b")+
 theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Phenotypic plasticity to temperature (days/°C)")+
-geom_hline(yintercept=0,linetype="dashed")+coord_flip()+labs(color="Period used for estimation:")+
+coord_flip()+labs(color="Period used for estimation:")+
 scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
 
-pl3=ggplot(data=subset(b2,type=="evolution of plasticity"),aes(x=variable,y=mean,color=varia))+geom_point()+
+pl3=ggplot(data=subset(b2,type=="evolution of plasticity"),aes(x=variable,y=mean,color=varia))+
+geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
 geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("c")+
 theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Evolution of phenotypic plasticity (days/°C)")+
-geom_hline(yintercept=0,linetype="dashed")+coord_flip()+labs(color="Period on which changes are integrated:")+
+coord_flip()+labs(color="Period on which changes are integrated:")+
 scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
 
 plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.7,1,1),align="h")
 
-pdf("figure3.pdf",height=4,width=12)
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+pdf("figure4.pdf",height=4,width=12)
 plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.8,1,1),align="h")
 dev.off();

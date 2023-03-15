@@ -27,28 +27,28 @@ shp <- st_read(".", "Europe_coastline")
 # print(i)
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
-liste=fread("selec_temp_var_beta.txt",sep="\t")
-liste=subset(liste,nb_pre1990>=50 & nb_post1990>=500)
-vec=names(liste)[grep("temp",names(liste),fixed=T)]
-nb=liste[,c("Speciesgen","Species","FAMILLE","ORDRE","nb_pre1990","nb_post1990")]
+dat=fread("selec_temp_var_beta.txt",sep="\t")
+liste=data.frame(Speciesgen=unique(dat$Speciesgen),nb_pre1990=dat$nb_pre1990[!duplicated(dat$Speciesgen)],nb_post1990=dat$nb_post1990[!duplicated(dat$Speciesgen)])
+liste$nb=liste$nb_pre1990+liste$nb_post1990
 
 resf=NULL
 for(i in 1:nrow(liste)){
+i=which(liste$Speciesgen=="Acasis viretata_2")
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",liste$Speciesgen[i],".txt"))
-bidon=subset(bidon, !is.na(temp_0_90))
+bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
 
-bidon$elev2=bidon$elev
-bidon$elev=(bidon$elev-mean(bidon$elev,na.rm=T))/1000
-bidon$Annee2=bidon$Annee
+bidon$Altitude2=bidon$Altitude
+bidon$Altitude=(bidon$Altitude-mean(bidon$Altitude,na.rm=T))/1000
+bidon$Annee2=bidon$Annee-1990
 bidon$Annee=bidon$Annee-1960
 bidon$maille_slope=bidon$maille
-varia=vec[which(!is.na(liste[i,vec,with=F]))]
+varia=subset(dat,Speciesgen==liste$Speciesgen[i])$varia
 
 listevar=list(Annee = bidon$Annee,Annee2=bidon$Annee2,maille=bidon$maille,
 maille_slope=bidon$maille_slope,maille_slope1=bidon$maille_slope,maille_slope2=bidon$maille_slope,
 maille_slope3=bidon$maille_slope,
-elev = bidon$elev)
+Altitude = bidon$Altitude,beta0=rep(1,nrow(bidon)))
 b=length(listevar)
 for(j in 1:length(varia)){
 listevar[j+b]=c(bidon[,paste(varia[j]),with=F])
@@ -63,34 +63,45 @@ spts=as(sfpts, "Spatial")
 prdomain <- inla.nonconvex.hull(as.matrix(bidon[,c("X","Y")]), -0.03, -0.05, resolution = c(100, 100))
 if(nrow(bidon)<20000){clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(100000, 100000),cutoff=1)
 }else{
-clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(100000, 100000),cutoff=0.05)
+clm.mesh <- inla.mesh.2d(loc=spts,boundary=prdomain, max.edge = c(100000, 100000),cutoff=1000)
 }
 
-par(mar = c(0, 0, 0, 0))
-plot(clm.mesh, asp = 1, main = "")
-xmin=-11
-xmax=2.3
-ymin=49.9
-ymax=59.6
-e <- as(raster::extent(xmin,xmax,ymin,ymax), "SpatialPolygons") %>% 
-  st_as_sf() %>% st_set_crs(4326) %>% st_transform(st_crs(shp))
-grd_lrg <- st_make_grid(e, cellsize = c(50000,50000))
-plot(grd_lrg,add=T)
+#par(mar = c(0, 0, 0, 0))
+#plot(clm.mesh, asp = 1, main = "")
+#xmin=-11
+#xmax=2.3
+#ymin=49.9
+#ymax=59.6
+#e <- as(raster::extent(xmin,xmax,ymin,ymax), "SpatialPolygons") %>% 
+#  st_as_sf() %>% st_set_crs(4326) %>% st_transform(st_crs(shp))
+#grd_lrg <- st_make_grid(e, cellsize = c(50000,50000))
+#plot(grd_lrg,add=T)
 
   
 A <- inla.spde.make.A(clm.mesh, loc = as.matrix(bidon[,c("X","Y")]))
 
 spde <- inla.spde2.matern(clm.mesh, alpha = 2)
 mesh.index <- inla.spde.make.index(name = "field", n.spde = spde$n.spde)
-stk.dat <- inla.stack(data = list(y = bidon$Jour.de.collecte), A = list(A, 1), tag = "est", effects = list(c(list(Intercept=1),mesh.index),
+stk.dat <- inla.stack(data = list(y = bidon$Jour.de.collecte), A = list(A, 1), tag = "est", effects = list(list(field=mesh.index$field),
 listevar))
-f.s=formula(paste0("y~-1+",paste(varia,collapse="+"),
-"+elev+Annee+f(maille,model = 'iid')+f(maille_slope,Annee,model = 'iid')+",paste(paste0("f(maille_slope",c(1:length(varia)),",",varia,",model='iid')"),collapse="+"),
-"+f(field,model=spde)+f(Annee2,model='ar1')"))
-model <- inla(f.s, family = "gaussian", data = inla.stack.data(stk.dat), verbose = TRUE, 
+f.s=formula(paste0("y~0+beta0+",paste(varia,collapse="+"),
+"+Altitude+Annee+f(maille,model = 'iid')+f(maille_slope,Annee,model = 'iid')+",paste(paste0("f(maille_slope",c(1:length(varia)),",",varia,",model='iid')"),collapse="+"),
+"+f(field,model=spde)+f(Annee2,model='rw1')"))
+model <- inla(f.s, family = "gaussian", data = inla.stack.data(stk.dat), verbose = FALSE, 
     control.predictor = list(A = inla.stack.A(stk.dat), compute = TRUE))
-	
-save(model,file=paste0("model_",liste$Speciesgen[i],".RData"))
+print(model$summary.fixed["Annee",])
+
+f.s2=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
+"+Altitude+Annee2+",paste0("(1+Annee2+",paste0(varia,collapse="+"),"|maille)"),
+"+(1|Annee)"))
+model2=lmer(f.s2,data=bidon)
+
+
+model2 <- lme(formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),"+Altitude+Annee2"))  , random = formula(paste0("~(1+Annee2+",paste0(varia,collapse="+"),")|maille")), 
+                     data = bidon,correlation = corExp(form = ~ Longitude + Latitude))
+
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+save(model,file=paste0("model_",gsub(" ","_",liste$Speciesgen[i],fixed=T),".RData"))
 	
 bidon$resid=bidon$Jour.de.collecte-model$summary.fitted.values$mean[grep("APredictor",rownames(model$summary.fitted.values),fixed=T)]
 res=as.data.frame(model$summary.fixed)
@@ -102,11 +113,10 @@ res$Var[res$varia %in% rownames(model$summary.hyperpar)]=model$summary.hyperpar$
 res$Speciesgen=liste$Speciesgen[i]
 res$latmean=mean(bidon$Y)
 res$longmean=mean(bidon$X)
-res$elevmean=mean(bidon$elev2,na.rm=T)
+res$Altitudemean=mean(bidon$Altitude2,na.rm=T)
 res$mfd=mean(bidon$Jour.de.collecte)
 res$nb_annee=length(unique(bidon$Annee))
 res$nbdata=nrow(bidon)
-res$trend=NA
 bidon$Annee2=plyr::round_any(bidon$Annee,2)
 b=bidon %>% dplyr::group_by(Speciesgen,Annee2) %>% dplyr::summarise(skew=skewness(resid),nbd=length(resid),
 kurt=kurtosis(resid))
@@ -118,7 +128,29 @@ modelkurt=lm(kurt~Annee2,data=b,weights=sqrt(nbd))
 res$trend_kurt=modelkurt$coeff[2]
 res$trend_kurt_err=summary(modelkurt)$coeff[2,2]
 
+resqual=as.data.frame(bidon %>% dplyr::group_by(Speciesgen,Species,FAMILLE,ORDRE,maille,ctr_lon,ctr_lat) %>%
+dplyr::summarise(n=length(unique(Annee))))
+
+resqual=cbind(resqual,data.frame(Annee=model$summary.random$maille_slope$mean+model$summary.fixed["Annee","mean"],Annee_sde=sqrt(model$summary.random$maille_slope$sd^2+model$summary.fixed["Annee","sd"]^2)))
+biche=data.frame(model$summary.random$maille_slope1$mean+model$summary.fixed[varia[1],"mean"],sqrt(model$summary.random$maille_slope1$sd^2+model$summary.fixed[varia[1],"sd"]^2),
+model$summary.random$maille_slope2$mean+model$summary.fixed[varia[2],"mean"],sqrt(model$summary.random$maille_slope2$sd^2+model$summary.fixed[varia[2],"sd"]^2))
+names(biche)=paste0(rep(varia,each=2),c("","_sde"))
+biche=biche[,!is.na(names(biche))]
+resqual=cbind(resqual,biche)
+
+
+res$trend=NA
+for(j in varia){
+formu=formula(paste0(j,"~Annee+(1+Annee|maille)"))
+data=subset(temp,Annee>=min(bidon$Annee2+1990) & Annee<=max(bidon$Annee2+1990) & maille %in% bidon$maille)
+mod <- lmer(formu,data=data)
+res$trend[res$varia==j]=fixef(mod)[2]
+resqual[,paste0(j,"_trend")]=ranef(mod)$maille$Annee
+}
+
+
 resf=rbind(resf,res)
+resqual=subset(resqual,n>=5)
 }
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
@@ -128,18 +160,10 @@ fwrite(resf,"plast_adapt.txt",sep="\t")
 pkgs <- c("ggplot2", "mgcv", "MASS","car","gplots","doBy","dplyr","lme4","mgcv","numDeriv","nleqslv","lubridate","reshape2","Hmisc",
 "fitdistrplus","geosphere","pastecs","SDMtools","jtools","gridExtra","stats","ggmap")
 lapply(pkgs, require, character.only = TRUE,quietly=T)
-setwd(dir="C:/Users/Francois/Documents/papier 1 - données collection/data")
-library(mgcv)
-library(numDeriv)
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
 library(nleqslv)
-library(lubridate)
-library(Hmisc)
-library(stats)
-library(pastecs)
-library(SDMTools)
 library(geosphere)
 library(fitdistrplus)
-library(reshape2)
 library(data.table)
 library(glmmTMB)
 library(spaMM)
@@ -151,190 +175,44 @@ library(RColorBrewer)
 library(ggraph)
 library(igraph)
 
-# setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/résultats simus")
-# dat=fread("trend_plasticite.txt")
-# dat=subset(dat,param=="as.numeric(Annee)")
-# hist(dat$Estimate)
-# names(dat)[names(dat)=="Esp"]="Species"
-# names(dat)[names(dat)=="Estimate"]="trend"
-# setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/data_occ_UK")
-# occt=fread("trends.txt",sep="\t",header=T)
-# resf=merge(dat,occt[,c("Species","Mean_growth_rate","Precision")],by="Species",all.x=T,all.y=F)
-# setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/SUMMARY_TABLES")
-# lili=list.files()
-# vec=c()
-# for(i in unique(dat$Species)){
-# vec=c(vec,grep(i,lili))
-# }
-# lili=lili[vec]
-# objf=NULL
-# for(i in lili){
-# obj=fread(i,header=T)
-# obj=obj[obj$Region %in% c("UK","GB"),]
-# obj$Mean2=car::logit(obj$Mean)
-# obj$Lower_CI2=car::logit(obj$Lower_CI)
-# obj$Upper_CI2=car::logit(obj$Upper_CI)
-# obj$wei=obj$Upper_CI2-obj$Lower_CI2
-# obj$wei[obj$wei<1e-7]=0.001
-# model=lm(Mean2~Year,data=obj,weights=1/wei)
-# obj$trend_ang=model$coeff[2]
-# obj$trend_err=summary(model)$coeff[2,2]
-# objf=rbind(obj,objf)
-# }
 
-# obf2=unique(objf[,c("Species","trend_ang","trend_err")])
-# obf2=objf %>% dplyr::group_by(Species,trend_ang,trend_err) %>% dplyr::summarise(abond=mean(Mean))
-# resf=merge(resf,obf2,by="Species",all.x=T,all.y=F)
-setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/data")
-elev=fread("elev_by_species.txt",header=T)
-plast=fread("plast_adapt.txt",sep="\t",header=T)
-liste=fread("nb_data.txt",sep="\t")
-plast=merge(plast,liste,by="Speciesgen")
-resf=merge(plast,elev,by="Speciesgen")
-#resf=merge(resf,plast,by="Species")
-#resf=resf[grep("_NA",resf$Speciesgen),]
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+liste=fread("selec_temp_var_beta.txt",sep="\t")
+liste=subset(liste,nb_pre1990>=50 & nb_post1990>=500)
+vec=names(liste)[grep("temp",names(liste),fixed=T)]
+nb=liste[,c("Speciesgen","Species","FAMILLE","ORDRE","nb_pre1990","nb_post1990")]
+
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+resf=NULL
+lili=list.files()
+lili=lili[grep("_qual.txt",lili,invert=T)]
+for(i in lili){
+bidon=fread(i,sep="\t")
+resf=rbind(resf,bidon)
+}
+
+plot(mean~Estimate,data=resf[resf$varia %in% c("Annee2"),])
+abline(0,1)
+cor(resf[(resf$varia %in% c("Annee2")),c("mean","Estimate")])
+
+plot(mean~Estimate,data=resf[grep("temp_",resf$varia),])
+cor(resf[grep("temp_",resf$varia),c("mean","Estimate")])
+
+
 resf$type=NA
 resf$type[grep("temp",resf$varia)]="plast"
 resf$type[grep("Annee",resf$varia)]="adapt"
-resf$saison=NA
-resf$saison[resf$varia %in% c("temp_300_25","temp_330_55","temp_0_90")]="hiver"
-resf$saison[resf$varia %in% c("temp_60_150","temp_120_210","temp_180_270","temp_30_120",
-"temp_270_360","temp_90_180","temp_210_300","temp_240_330")]="été"
-resf$saison[resf$varia %in% c("temp_60_150","temp_30_120","temp_90_180")]="printemps"
-resf$saison[resf$varia %in% c("temp_240_330","temp_270_360","temp_210_300")]="automne"
-resf$varia=factor(resf$varia,c("temp_300_25","temp_330_55","temp_0_90","temp_30_120","temp_60_150","temp_90_180",
-"temp_120_210","temp_150_240","temp_180_270","temp_210_300","temp_240_330","temp_270_360"))
-resf$varia=gsub("temp_","",resf$varia)
-resf$varia=gsub("_","-",resf$varia)
-resf$varia=factor(resf$varia,c("300-25","330-55","0-90","30-120","60-150","90-180",
-"120-210","150-240","180-270","210-300","240-330","270-360"))
-resf$Est.lwr=resf$Estimate-1.96*resf$"Cond. SE"
-resf$Est.upr=resf$Estimate+1.96*resf$"Cond. SE"
+names(resf)[3:5]=c("lwr","median","upr")
 resf$Est.signi=">0.05"
-resf$Est.signi[resf$Est.lwr>0]="<0.05"
-resf$Est.signi[resf$Est.upr<0]="<0.05"
-resf$date_fin=as.numeric(sapply(strsplit(as.character(resf$varia),"-"), function(l) l[[length(l)]]))
-names(resf)[names(resf)=="Cond. SE"]="Cond.SE"
-names(resf)[names(resf)=="Std. Error"]="Std.Error"
+resf$Est.signi[resf$lwr>0]="<0.05"
+resf$Est.signi[resf$upr<0]="<0.05"
 
-b=subset(resf,!is.na(varia)) %>% group_by(Speciesgen,Est.signi) %>% dplyr::count()
-b %>% group_by(Est.signi,n) %>% dplyr::summarise(nb=n(),perc=n()/length(unique(resf$Speciesgen)))
-
-
-setwd(dir="C:/Users/Francois/Documents/land use change/European_costlines")
-shp <- st_read(".", "Europe_coastline")
-bidon=sf::st_transform(sf::st_as_sf(resf,coords = c('longmean','latmean'),crs=st_crs(shp)),crs=4326)
-bidon2=as.data.frame(st_coordinates(bidon))
-resf$latitude=bidon2[,2]
-resf$longitude=bidon2[,1]
-setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/data")
 coucou=c("magenta2",brewer.pal(5,"Set2")[5],"red","dodgerblue4")
-####### PLAST ######
-library(ggraph)
-summary(subset(resf,varia=="90-180")$Estimate)
-sd(subset(resf,varia=="90-180")$Estimate)/sqrt(nrow(subset(resf,varia=="90-180")))
-resf$longmean2=scale(resf$longitude,scale=F)
-resf$latmean2=scale(resf$latitude,scale=F)
-bidon=subset(resf,!is.na(varia))
-bidon$contrib=bidon$Estimate
-mati=as.data.frame(dcast(bidon,ORDRE+Speciesgen+mfd~varia,value.var="Estimate"))
-mati2=as.matrix(mati[,-c(1:3)])
-rownames(mati2)=c(as.character(mati[,2]))
-colnames(mati2)=names(mati[,-c(1:3)])
-mati2[is.na(mati2)]=0
-graph=graph_from_incidence_matrix(mati2, directed = FALSE,weighted =T)
-plot(graph,vertex.label=NA,layout=layout_as_bipartite)
-dipt=unique(mati$Speciesgen[mati$ORDRE=="Diptera"])
-lep=unique(mati$Speciesgen[mati$ORDRE=="Lepidoptera"])
-cole=unique(mati$Speciesgen[mati$ORDRE=="Coleoptera"])
-hym=unique(mati$Speciesgen[mati$ORDRE=="Hymenoptera"])
-tab_temp=unique(bidon[,c("varia","date_fin")])
-
-V(graph)$mfd=NA
-V(graph)$mfd=ifelse(V(graph)$name %in% tab_temp$varia,tab_temp$date_fin[match(tab_temp$varia,V(graph)$name)],
-mati$mfd[match(mati$Speciesgen,V(graph)$name)])
-V(graph)$ORDRE <- NA
-V(graph)$ORDRE <- ifelse(V(graph)$name %in% dipt, 'Diptera',ifelse(V(graph)$name %in% lep, 'Lepidoptera',
-ifelse(V(graph)$name %in% cole, 'Coleoptera',ifelse(V(graph)$name %in% hym, 'Hymenoptera'," Temperature indices"))))
-#V(graph)$ORDRE=factor(V(graph)$ORDRE,c("Temperature indices","Coleoptera","Diptera","Hymenoptera","Lepidoptera"))
-zeropos=abs(min(E(graph)$weight))/(max(E(graph)$weight)-min(E(graph)$weight))
-graph1=subgraph(graph, which(V(graph)$ORDRE %in% c("Coleoptera","Diptera"," Temperature indices")))
-pl1=ggraph(graph1, 'hive', axis=ORDRE,sort.by=mfd) + 
-geom_edge_hive(aes(color=weight,alpha=abs(weight),width=abs(weight)))+
-scale_edge_colour_gradientn(colours=c("firebrick4","pink","white","cadetblue1","dodgerblue4"),
-values=c(0,zeropos-0.01,zeropos,zeropos+0.01,1),name="Effect (day/°C)",
-limits=c(min(E(graph)$weight),max(E(graph)$weight)))+
-scale_edge_width_continuous(range = c(0.1, 2),guide=F)+
-scale_edge_alpha_continuous(range = c(0,1),guide=F)+
-geom_axis_hive(color="black",alpha=1)+theme(panel.background=element_rect(fill="white"),
-plot.title=element_text(size=14,face="bold"),legend.position="none")+
-labs(color="Effect")+ggtitle("a")
-
-graph2=subgraph(graph, which(V(graph)$ORDRE %in% c("Lepidoptera","Hymenoptera"," Temperature indices")))
-pl2=ggraph(graph2, 'hive', axis=ORDRE,sort.by=mfd) + 
-geom_edge_hive(aes(color=weight,alpha=abs(weight),width=abs(weight)))+
-scale_edge_colour_gradientn(colours=c("firebrick4","pink","white","cadetblue1","dodgerblue4"),
-values=c(0,zeropos-0.01,zeropos,zeropos+0.01,1),name="Effect (day/°C)",
-limits=c(min(E(graph)$weight),max(E(graph)$weight)))+
-scale_edge_width_continuous(range = c(0.1, 2),guide=F)+
-scale_edge_alpha_continuous(range = c(0,1),guide=F)+
-geom_axis_hive(color="black",alpha=1)+theme(panel.background=element_rect(fill="white"),
-plot.title=element_text(size=14,face="bold"))+
-labs(color="Effect")+ggtitle("b")
-
-model=lmer(Estimate~longmean2+elev+latmean2+mfd*poly(date_fin,2)+(1|ORDRE)+(1|FAMILLE)+(1|Species)+
-(1|Speciesgen),
-data=bidon,weights=sqrt(1/Cond.SE))
-
-
-b=ggeffect(model,c("date_fin","mfd"))
-b$group=round(as.numeric(as.character(b$group)))
-pl3=ggplot(b,aes(x=x,y=predicted,group=group,color=as.factor(group),fill=as.factor(group)))+
-geom_ribbon(aes(ymin=conf.low,ymax=conf.high),alpha=0.5,col=NA)+
-scale_color_manual(values=c(brewer.pal(9,"YlOrRd")[c(4,6,9)]))+
-scale_fill_manual(values=c(brewer.pal(9,"YlOrRd")[c(4,6,9)]))+
-geom_line()+theme_bw()+theme(plot.title=element_text(size=14,face="bold"),legend.position="right",
-axis.text.x=element_text(angle = 45,hjust=0.9))+
-ggtitle("c")+
-xlab("3-month temperature indices (in day of the year),\nfrom winter (left) to autumnal (right) temperatures")+
-ylab("Predicted phenotypic plasticity (day/°C)\n")+labs(color="MFD\n(day of the year)",fill="MFD\n(day of the year)")+
-scale_x_continuous(breaks=tab_temp$date_fin,labels=tab_temp$varia)
-
-grid.arrange(pl1,pl2,pl3,layout_matrix=matrix(c(1,3,2,3),nrow=2),widths=c(1,1.5))
-
-setwd(dir="C:/Users/Francois/Documents/papier 2 - plasticité- adaptation/data")
-pdf(paste0("fig_plast_season.pdf"),width=8,height=7)
-grid.arrange(pl1,pl2,pl3,layout_matrix=matrix(c(1,3,2,3),nrow=2),widths=c(1,1.5))
-dev.off();
-
-
-leg <- cowplot::get_legend(pl1)
-pl1=pl1+theme(legend.position="none")
-# Convert to a ggplot and print
-
-resf=resf %>% dplyr::mutate(nsp=length(unique(Species))) %>% ungroup()
-b=resf %>% dplyr::group_by(varia,ORDRE) %>% dplyr::summarise(perc=length(unique(Species)),count=unique(nsp))
-
-pl2=ggplot(data=subset(b,!is.na(varia)),aes(x=varia,y=perc/count,col=NA,fill=ORDRE))+
-geom_bar(stat="identity",width=0.5) + 
-scale_y_continuous(breaks=c(0,0.25,0.5),labels=scales::percent(c(0,0.25,0.5)))+theme_bw()+
-theme(plot.title=element_text(size=14,face="bold"),legend.position="right",legend.title=element_blank(),
-axis.text.x=element_text(angle = 45,hjust=0.9))+
-ggtitle("b")+xlab("3-month temperature indices (day of the year)")+ylab("Percentage of species responding")+
-scale_color_manual(values=coucou)+
-scale_fill_manual(values=coucou)
-leg2 <- cowplot::get_legend(pl2)
-pl2=pl2+theme(legend.position="none")
-
-blan=patchwork::plot_spacer()+theme_void()
-grid.arrange(pl1,pl2,leg,leg2,heights=c(1.5,1),widths=c(3.5,1),layout_matrix=matrix(c(1,2,3,4),nrow=2))
-
 
 ####### ADAPT ######
-
 resf$Est.signi=factor(resf$Est.signi,c(">0.05","<0.05"))
 b=subset(resf,type=="adapt" & Est.signi=="<0.05") %>% group_by(Speciesgen) %>% dplyr::count()
-p=ggplot(data=subset(resf,type=="adapt"),aes(x=Estimate,fill=Est.signi))+geom_histogram(col="black")+
+p=ggplot(data=subset(resf,type=="adapt"),aes(x=mean,fill=Est.signi))+geom_histogram(col="black")+
 geom_vline(xintercept=0,col="red")+
 scale_fill_manual(values=c("white","black"))+theme_bw()+
 theme(panel.grid.minor=element_blank(),strip.background = element_blank(),
