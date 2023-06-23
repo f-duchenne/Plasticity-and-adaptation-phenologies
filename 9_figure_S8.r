@@ -40,7 +40,7 @@ resf=rbind(resf,bidon)
 }
 
 
-b=resf %>% dplyr::group_by(Speciesgen,varia) %>% dplyr::summarise(INLA=sd(mean)/mean(mean),LMER=sd(Estimate)/mean(Estimate))
+b=resf %>% dplyr::group_by(Speciesgen,varia) %>% dplyr::summarise(INLA=sd(mean)/abs(mean(mean)),LMER=sd(Estimate)/abs(mean(Estimate)))
 b2=melt(b,id.vars=c("Speciesgen","varia"))
 
 b2$varia=as.character(b2$varia)
@@ -258,7 +258,7 @@ FacetZoom2 <- ggproto("FacetZoom2",ggforce::FacetZoom,compute_layout = function(
 pl1=ggplot(data=subset(b2,abs(value)<100),aes(x=varia,y=value,color=variable))+geom_boxplot()+theme_bw()+
 theme(panel.grid=element_blank(),panel.border=element_blank(),axis.line = element_line(colour = "black"),axis.text.x=element_text(angle=45,hjust=1),
 plot.title=element_text(size=14,face="bold"),axis.title.x=element_blank(),legend.position="left")+ylab("Coefficient of variation over 3 runs")+labs(color="Model:")+
-facet_zoom2(y=TRUE,ylim =c(-5,5),split = TRUE)
+facet_zoom2(y=TRUE,ylim =c(0,5),split = TRUE)
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
 png("figure_S5.png",height=800,width=900,res=120)

@@ -1,21 +1,13 @@
-pkgs <- c("ggplot2", "mgcv", "MASS","car","gplots","doBy","dplyr","lme4","mgcv","numDeriv","nleqslv","lubridate","reshape2","Hmisc",
-"fitdistrplus","geosphere","plyr","pastecs","SDMtools","jtools","gridExtra","stats","ggmap")
-lapply(pkgs, require, character.only = TRUE,quietly=T)
-setwd(dir="C:/Users/Francois/Documents/papier 1 - données collection/data")
-library(mgcv)
-library(numDeriv)
-library(nleqslv)
 library(lubridate)
-library(Hmisc)
-library(stats)
 library(plyr)
-library(pastecs)
+library(ggmap)
 library(SDMTools)
 library(geosphere)
-library(fitdistrplus)
 library(reshape2)
 library(data.table)
-library(glmmTMB)
+library(raster)
+library(sf)
+library(rgdal)
 xmin=-11
 xmax=2.3
 ymin=49.9
@@ -23,6 +15,7 @@ ymax=59.6
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 donnf2=fread("data_final_avec_gen2.txt",sep="\t",header=T)
 donnf2=donnf2[,-c(1:2)]
+names(donnf2)[c(2,22)]=c("Species","Speciesgen")
 donnf2$Annee=as.numeric(as.character(donnf2$Annee))
 donnf2=donnf2 %>% filter(Latitude>=ymin & Latitude<=ymax & Longitude>=xmin & Longitude<=xmax)
 donnf2=donnf2 %>% dplyr::filter(Latitude>50.53 | Longitude<(-0.7))
@@ -31,7 +24,6 @@ donnf2=donnf2 %>% filter(Annee>=1960)
 #plot(unique(donnf2[,c("Longitude2","Latitude2")]))
 donnf2$categorie="A"
 donnf2$categorie[which(donnf2$Annee>=1990)]="B"
-names(donnf2)[names(donnf2)=="Espèce"]="Species"
 donnf2$Speciesgen=paste(donnf2$Species,donnf2$gen,sep="_")
 b=donnf2 %>% dplyr::group_by(ORDRE,Speciesgen,categorie) %>% dplyr::summarise(n=n_distinct(Reference))
 b=dcast(b,Speciesgen+ORDRE~categorie,value.var="n")
@@ -42,9 +34,6 @@ donnf2=donnf2[donnf2$Speciesgen %in% b2$Speciesgen,]
 
 
 
-library(raster)
-library(sf)
-library(rgdal)
 setwd(dir="D:/land use change/European_costlines")
 shp <- st_read(".", "Europe_coastline")
 e <- as(raster::extent(xmin,xmax,ymin,ymax), "SpatialPolygons") %>% 
@@ -87,8 +76,6 @@ setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 #charger le package:
 library(climateExtract)
 library(plyr)
-
-library(nlme)
 library(raster)
 library(data.table)
 memory.limit(size = 1e9)
@@ -163,16 +150,10 @@ write.table(tabf2,"annual_mean_by_indice_and_by_point_mat.txt",sep="\t",row.name
 ###ADD ELEVATION###
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 library(mgcv)
-library(numDeriv)
-library(nleqslv)
 library(lubridate)
-library(Hmisc)
-library(stats)
 library(plyr)
-library(pastecs)
 library(SDMTools)
 library(geosphere)
-library(fitdistrplus)
 library(reshape2)
 library(data.table)
 library(dplyr)

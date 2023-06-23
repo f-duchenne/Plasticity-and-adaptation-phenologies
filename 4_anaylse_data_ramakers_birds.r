@@ -186,6 +186,6 @@ scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.
 plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.7,1,1),align="h")
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
-pdf("figure4.pdf",height=4,width=12)
+pdf("figureS5.pdf",height=4,width=12)
 plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.8,1,1),align="h")
 dev.off();

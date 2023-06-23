@@ -19,6 +19,9 @@ vec_z=c(0.03,0.05,0.07,0.1,0.15,0.2,0.25,0.3,0.4,0.5) #standard deviation of the
 nb_chaine=2000
 nbit_vec=c(25,30,35,40,45,50,55)
 nbdata_vec=c(500,1000,1500,2500)
+mechanisms=c("without_adapt","without_plast","without_evol_plast","total")
+
+tabtab=expand.grid(nbdata_vec,nbit_vec,mechanisms)
 
 ri=2 #the degree of the function defined for the increase of the record number across year. 1 = linear increase, 2 = quadratic increase...
 #fonction pour définir le nombre de données par an à partir de la fonction :
@@ -41,24 +44,26 @@ k=1
 wtd.mean=function(x,y){sum(x*y)/sum(y)}
 
 
-res2=as.data.frame(matrix(NA,length(nbit_vec)*nb_chaine*length(vec_z),33))
+res2=as.data.frame(matrix(NA,nb_chaine*length(vec_z),37))
 names(res2)=c("nbit","sigma","chaine","correlation","data_number","ti",
 "t_adapt","t_plast","t_evolplast",
+"t_adapt_pval","t_plast_pval","t_evolplast_pval",
 "adapt","plast","evol_plast","error_adapt","error_plast","error_inter",
 "pval_plast","pval_adapt","pval_inter",
-"adapt_lmer","plast_lmer","evol_plast_lmer","error_adapt_lmer","error_plast_lmer","error_inter_lmer",
-"pval_plast_lmer","pval_adapt_lmer","pval_inter_lmer",
-"pval_t_adapt","pval_t_evol_plast","annee_eval","temp_eval","G_adapt","G_plast")
+"adapt_wi","plast_wi","evol_plast_wi","error_adapt_wi","error_plast_wi","error_inter_wi",
+"pval_plast_wi","pval_adapt_wi","pval_inter_wi",
+"pval_t_adapt","pval_t_evol_plast","annee_eval","temp_eval","G_adapt","G_plast","mechanism")
 
-nb_data=nbdata_vec[i] #number of records
+nb_data=tabtab[i,1] #number of records
 
-for (nb in 1:length(nbit_vec)){
-nbit=nbit_vec[nb] #number of years
+nbit=tabtab[i,2]  #number of years
 
 #spread records by years :
 # vec_nb=ceiling((c(1:nbit)/(uniroot(func,c(0,1000))[[1]]))^ri)
 vec_nb=rep(floor(nb_data/nbit),nbit)
 vec_nb[length(vec_nb)]=nb_data-sum(vec_nb[1:(length(vec_nb)-1)])
+
+mecha=tabtab[i,3]
 
 for (z in 1:length(vec_z)){
 sigmat=vec_z[z] #standard deviation of the gaussian used to draw temperature
@@ -73,12 +78,16 @@ names(res)=c("records","mfd_opt","temp","index","temp_variance","chaine",
 b=0
 adapt=runif(1,-6,0) #changes in the optimal flight date in function of the temperature (day/°C)
 plast=runif(1,-6,6) #initial plasticity slope (day/°C)
+if(mecha=="without_plast"){plast=0}
 mfd=mfdi #initial MFD (julian days)
-G=matrix(c(runif(1,1,5),0,0,0),2,2) #covariance matrix of the reaction norm parameters
-ti=0.015
+if(mecha=="without_adapt"){G=matrix(c(0,0,0,runif(1,0.5,2)),2,2)} #covariance matrix of the reaction norm parameters
+if(mecha %in% c("without_plast","without_evol_plast")){G=matrix(c(runif(1,1,5),0,0,0),2,2)}
+if(mecha=="total"){G=matrix(c(runif(1,1,5),0,0,runif(1,0.5,2)),2,2)}
+
+ti=0.015 #temperature increase
 for (i in 1:nbit){
 a=b+1
-#à chaque itération la température est tirée dans une gaussienne dont la moyenne augmente de 0.01 par an
+#à chaque itération la température est tirée dans une gaussienne dont la moyenne augmente de ti par an
 tep=rnorm(1,t_init+i*ti,sigmat)
 delta=tep-t_init
 # la nouvelle date moyenne de vol optimale est définie en fonction de la température, par la valeur adapt:
@@ -166,75 +175,80 @@ ano2=Anova(model2)
 # mean(aval)
 # mean(bibi$adaptation)
 
+index_row=k+(z-1)*nb_chaine
 #le nombre d'année
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),1]=nbit
+res2[index_row,"nbit"]=nbit
 #l'écart type de la gaussienne utilisée pour la température
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),2]=vec_z[z]
+res2[index_row,"sigma"]=vec_z[z]
 # le numéro de la chaine
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),3]=k
+res2[index_row,"chaine"]=k
 # la corrélation temps-température
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),4]=cor(res$index,res$temp)
+res2[index_row,"correlation"]=cor(res$index,res$temp)
 #le nombre de données totale
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),5]=sum(vec_nb)
+res2[index_row,"data_number"]=sum(vec_nb)
 #temperature increase
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),6]=ti
+res2[index_row,"ti"]=ti
 
 #les valeurs d'adaptation et de plasticité
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),7]=mean(bibi$adaptation)
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),8]=bibi$plast[bibi$index==round(annee_eval)]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),9]=mean(bibi$evol_plast)#evol_plast
+res2[index_row,"t_adapt"]=mean(bibi$adaptation)
+res2[index_row,"t_plast"]=bibi$plast[bibi$index==round(annee_eval)]
+res2[index_row,"t_evolplast"]=mean(bibi$evol_plast)#evol_plast
+#les erreurs d'adaptation et de plasticité
+res2[index_row,"t_adapt_pval"]=if(mecha %in% c("without_adapt")){1}else{summary(lm(mfd_adapt~index,data=bibi))$coeff["index","Pr(>|t|)"]}
+res2[index_row,"t_plast_pval"]=NA
+res2[index_row,"t_evolplast_pval"]=if(mecha %in% c("total","without_adapt")){summary(lm(plast~index,data=bibi))$coeff["index","Pr(>|t|)"]}else{1}
 
 #estimation de l'adaptation
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),10]=suma$coeff["index","Estimate"]
+res2[index_row,"adapt"]=suma$coeff["index","Estimate"]
 #estimation de la plasticité
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),11]=suma$coeff["temp","Estimate"]
+res2[index_row,"plast"]=suma$coeff["temp","Estimate"]
 #estimation de l'interaction
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),12]=if("temp:index" %in% rownames(suma$coeff)){
+res2[index_row,"evol_plast"]=if("temp:index" %in% rownames(suma$coeff)){
 suma$coeff["temp:index","Estimate"]}else{NA}
 #les erreurs faites sur les estimation d'adaptation et de plasticité
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),13]=suma$coeff["index","Std. Error"]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),14]=suma$coeff["temp","Std. Error"]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),15]=if("temp:index" %in% rownames(suma$coeff)){
+res2[index_row,"error_adapt"]=suma$coeff["index","Std. Error"]
+res2[index_row,"error_plast"]=suma$coeff["temp","Std. Error"]
+res2[index_row,"error_inter"]=if("temp:index" %in% rownames(suma$coeff)){
 suma$coeff["temp:index","Std. Error"]}else{NA}
 #les pvalues d'adaptation et de plasticité
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),16:18]=t(ano[1:3,4])
+res2[index_row,c("pval_plast","pval_adapt","pval_inter")]=t(ano[1:3,4])
 
 #estimation de l'adaptation lmer
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),19]=suma2$coeff["index","Estimate"]
+res2[index_row,"adapt_wi"]=suma2$coeff["index","Estimate"]
 #estimation de la plasticité lmer
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),20]=suma2$coeff["temp","Estimate"]
+res2[index_row,"plast_wi"]=suma2$coeff["temp","Estimate"]
 #estimation de l'interaction
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),21]=if("temp:index" %in% rownames(suma2$coeff)){
+res2[index_row,"evol_plast_wi"]=if("temp:index" %in% rownames(suma2$coeff)){
 suma2$coeff["temp2","Estimate"]}else{NA}
 #les erreurs faites sur les estimation d'adaptation et de plasticité lmer
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),22]=suma2$coeff["index","Std. Error"]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),23]=suma2$coeff["temp","Std. Error"]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),24]=if("temp:index2" %in% rownames(suma2$coeff)){
+res2[index_row,"error_adapt_wi"]=suma2$coeff["index","Std. Error"]
+res2[index_row,"error_plast_wi"]=suma2$coeff["temp","Std. Error"]
+res2[index_row,"error_inter_wi"]=if("temp:index2" %in% rownames(suma2$coeff)){
 suma2$coeff["temp:index2","Std. Error"]}else{NA}
 #les pvalues d'adaptation et de plasticité
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),25:27]=t(ano2[1:3,3])
+res2[index_row,c("pval_plast_wi","pval_adapt_wi","pval_inter_wi")]=t(ano2[1:3,4])
 
 #pval t_adapt
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),28]=summary(lm(mfd_adapt~index,data=bibi))$coeff[2,4]
+res2[index_row,"pval_t_adapt"]=summary(lm(mfd_adapt~index,data=bibi))$coeff[2,4]
 #pval t_plast
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),29]=summary(lm(plast~index,data=bibi))$coeff[2,4]
+res2[index_row,"pval_t_evol_plast"]=summary(lm(plast~index,data=bibi))$coeff[2,4]
 
 #annee_eval
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),30]=annee_eval
+res2[index_row,"annee_eval"]=annee_eval
 #temp_eval
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),31]=temp_eval
+res2[index_row,"temp_eval"]=temp_eval
 #G
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),32]=G[1,1]
-res2[k+(z-1)*nb_chaine+nb_chaine*length(vec_z)*(nb-1),33]=G[2,2]
+res2[index_row,"G_adapt"]=G[1,1]
+res2[index_row,"G_plast"]=G[2,2]
+res2[index_row,"mechanism"]=mecha
 }
-
+}
 # print(ggplot()+geom_point(data=res,aes(x=index,y=records),alpha=0.4)+geom_point(data=res,aes(x=index,y=mfd_true),col="firebrick",size=1.4)+
 # geom_point(data=res,aes(x=index,y=mfd_adapt),col="dodgerblue",size=1.4)+geom_pointrange(data=newres,aes(x=index,y=fit,ymin=lwr,ymax=upr),col="green")+
 # geom_abline(intercept=model$coef[1],slope=model$coef[3]))
 # print(paste("data_number = ",nbdata_vec[div]," - number of years = ",nbit," - standard deviation = ",vec_z[z],sep="")) 
-}
-}
+
 
 setwd(dir="/home/duchenne/plast/resultats_simues/")
-write.table(res2,paste("resultats_simulations_sans_g_evol_sans_plast_evol",nb_data,".txt",sep=""),row.names=F,sep="\t")
+write.table(res2,paste("resultats_simulations_sans_evol_de_g_",nb_data,"_",mecha,"_",nbit,".txt",sep=""),row.names=F,sep="\t")
 
