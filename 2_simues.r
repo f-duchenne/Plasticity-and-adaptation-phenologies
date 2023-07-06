@@ -19,7 +19,7 @@ vec_z=c(0.03,0.05,0.07,0.1,0.15,0.2,0.25,0.3,0.4,0.5) #standard deviation of the
 nb_chaine=2000
 nbit_vec=c(25,30,35,40,45,50,55)
 nbdata_vec=c(500,1000,1500,2500)
-mechanisms=c("without_adapt","without_plast","without_evol_plast","total")
+mechanisms=c("without_adapt","without_plast","without_evol_plast","total","without_evolution")
 
 tabtab=expand.grid(nbdata_vec,nbit_vec,mechanisms)
 
@@ -81,6 +81,7 @@ plast=runif(1,-6,6) #initial plasticity slope (day/°C)
 if(mecha=="without_plast"){plast=0}
 mfd=mfdi #initial MFD (julian days)
 if(mecha=="without_adapt"){G=matrix(c(0,0,0,runif(1,0.5,2)),2,2)} #covariance matrix of the reaction norm parameters
+if(mecha=="without_evolution"){G=matrix(c(0,0,0,0),2,2)} #covariance matrix of the reaction norm parameters
 if(mecha %in% c("without_plast","without_evol_plast")){G=matrix(c(runif(1,1,5),0,0,0),2,2)}
 if(mecha=="total"){G=matrix(c(runif(1,1,5),0,0,runif(1,0.5,2)),2,2)}
 
@@ -194,7 +195,7 @@ res2[index_row,"t_adapt"]=mean(bibi$adaptation)
 res2[index_row,"t_plast"]=bibi$plast[bibi$index==round(annee_eval)]
 res2[index_row,"t_evolplast"]=mean(bibi$evol_plast)#evol_plast
 #les erreurs d'adaptation et de plasticité
-res2[index_row,"t_adapt_pval"]=if(mecha %in% c("without_adapt")){1}else{summary(lm(mfd_adapt~index,data=bibi))$coeff["index","Pr(>|t|)"]}
+res2[index_row,"t_adapt_pval"]=if(mecha %in% c("without_adapt","without_evolution")){1}else{summary(lm(mfd_adapt~index,data=bibi))$coeff["index","Pr(>|t|)"]}
 res2[index_row,"t_plast_pval"]=NA
 res2[index_row,"t_evolplast_pval"]=if(mecha %in% c("total","without_adapt")){summary(lm(plast~index,data=bibi))$coeff["index","Pr(>|t|)"]}else{1}
 

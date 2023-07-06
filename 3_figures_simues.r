@@ -19,7 +19,7 @@ library(spaMM)
 #FIGURE PLOT SURFACE DES SUPPLEMENTARY:
 nbit_vec=c(25,30,35,40,45,50,55)
 nbdata_vec=c(500,1000,1500,2500)
-mechanisms=c("without_adapt","without_plast","without_evol_plast","total")
+mechanisms=c("without_adapt","without_plast","without_evol_plast","total","without_evolution")
 setwd(dir="C:/Users/duchenne/Documents/plast_adaptation/data/resultats_simues")
 tabtab=expand.grid(nbdata_vec,nbit_vec,mechanisms)
 res2=NULL
@@ -64,7 +64,7 @@ geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="das
 labs(col="Nb. of years")
 
 #grid.arrange(pl1,pl2)
-
+setwd(dir="C:/Users/duchenne/Documents/plast_adaptation")
 png("figure_S1.png",width=1100,height=700,res=120)
 grid.arrange(pl1,pl2)
 dev.off();
@@ -108,6 +108,7 @@ xlab("True value (from simulation) of evolution on phenotypic plasticity (days/Â
 geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="dashed")+
 labs(col="Nb. of years")
 
+setwd(dir="C:/Users/duchenne/Documents/plast_adaptation")
 png("figure_S2.png",width=1100,height=1100,res=120)
 grid.arrange(pl1,pl2,pl3)
 dev.off();
@@ -137,6 +138,7 @@ geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="das
 labs(col="Nb. of years")
 #grid.arrange(pl1,pl2)
 
+setwd(dir="C:/Users/duchenne/Documents/plast_adaptation")
 png("figure_S3.png",width=1100,height=700,res=120)
 grid.arrange(pl1,pl2)
 dev.off();
@@ -148,10 +150,79 @@ res2$cate=as.character(NA)
 res2$cate[res2$t_adapt_pval<alpha & res2$pval_adapt<alpha]="true positive"
 res2$cate[res2$t_adapt_pval>alpha & res2$pval_adapt>alpha]="true negative"
 res2$cate[res2$t_adapt_pval>alpha & res2$pval_adapt<alpha]="false positive"
+res2$cate[res2$t_adapt_pval>alpha & res2$pval_adapt<alpha & res2$adapt<0.01]="false positive, but very small estimate"
 res2$cate[res2$t_adapt_pval<alpha & res2$pval_adapt>alpha & sign(res2$t_adapt)!=sign(res2$adapt)]="opposite"
 res2$cate[res2$t_adapt_pval<alpha & res2$pval_adapt>alpha]="false negative"
 
-b=subset(res2,correlation<0.7 & correlation>0.1) %>% dplyr::group_by(mechanism,nbit,data_number,cate) %>% dplyr::count()
-b$cate=factor(b$cate,levels=c("false positive","true positive","true negative","false negative"))
+b=subset(res2,abs(correlation)<0.7) %>% dplyr::group_by(mechanism,nbit,data_number,cate) %>% dplyr::count()
+b$cate=factor(b$cate,levels=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")))
 
-ggplot(data=subset(b,mechanism=="without_evol_plast"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)
+pl1=ggplot(data=subset(b,mechanism=="total"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+
+scale_y_continuous(labels=scales::percent)+
+geom_hline(yintercept=0.05)+
+theme(panel.grid=element_blank(),strip.background=element_blank(),
+legend.position="right",strip.text=element_text(size=12),
+plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
+scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
+breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
+ggtitle("a - all mechanisms",subtitle=expression(paste("[",Gaa %~% U(1,5)," , ", Gbb %~% U(0.5,2)," , ",b[t==0] %~% U(-6,6),"]")))+
+ylab("Percentage of simulations")+xlab("Number of years")
+
+pl2=ggplot(data=subset(b,mechanism=="without_plast"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+
+scale_y_continuous(labels=scales::percent)+
+geom_hline(yintercept=0.05)+
+theme(panel.grid=element_blank(),strip.background=element_blank(),
+legend.position="right",strip.text=element_text(size=12),
+plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
+scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
+breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
+ggtitle("b - without plasticity",subtitle=expression(paste("[",Gaa %~% U(1,5)," , ", Gbb == 0," , ",b[t==0] == 0,"]")))+
+ylab("Percentage of simulations")+xlab("Number of years")
+
+pl3=ggplot(data=subset(b,mechanism=="without_adapt"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+
+scale_y_continuous(labels=scales::percent)+
+geom_hline(yintercept=0.05)+
+theme(panel.grid=element_blank(),strip.background=element_blank(),
+legend.position="right",strip.text=element_text(size=12),
+plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
+scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
+breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
+ggtitle("c - without evolution of elevation",subtitle=expression(paste("[",Gaa == 0," , ", Gbb %~% U(0.5,2)," , ",b[t==0] %~% U(-6,6),"]")))+
+ylab("Percentage of simulations")+xlab("Number of years")
+
+pl4=ggplot(data=subset(b,mechanism=="without_evol_plast"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+
+scale_y_continuous(labels=scales::percent)+
+geom_hline(yintercept=0.05)+
+theme(panel.grid=element_blank(),strip.background=element_blank(),
+legend.position="right",strip.text=element_text(size=12),
+plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
+scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
+breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
+ggtitle("d - without evolution of plasticity",subtitle=expression(paste("[",Gaa %~% U(1,5)," , ", Gbb == 0," , ",b[t==0] %~% U(-6,6),"]")))+
+ylab("Percentage of simulations")+xlab("Number of years")
+
+pl5=ggplot(data=subset(b,mechanism=="without_evolution"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+
+scale_y_continuous(labels=scales::percent)+
+geom_hline(yintercept=0.05)+
+theme(panel.grid=element_blank(),strip.background=element_blank(),
+legend.position="right",strip.text=element_text(size=12),
+plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
+scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
+breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
+ggtitle("e - without evolution",subtitle=expression(paste("[",Gaa == 0," , ", Gbb == 0," , ",b[t==0] %~% U(-6,6),"]")))+
+ylab("Percentage of simulations")+xlab("Number of years")
+
+
+leg <- ggpubr::as_ggplot(cowplot::get_legend(pl1))
+pl1=pl1+theme(legend.position="none")
+pl2=pl2+theme(legend.position="none")
+pl3=pl3+theme(legend.position="none")
+pl4=pl4+theme(legend.position="none")
+pl5=pl5+theme(legend.position="none")
+
+
+setwd(dir="C:/Users/duchenne/Documents/plast_adaptation")
+png("figure_S4.png",width=1000,height=1200,res=120)
+grid.arrange(pl1,pl2,pl3,pl4,pl5,leg,layout_matrix=rbind(c(1,2),c(3,4),c(5,56)),heights=c(1,1,1))
+dev.off();
+
