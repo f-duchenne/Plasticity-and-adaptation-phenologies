@@ -77,6 +77,8 @@ coucou=c("magenta2",brewer.pal(5,"Set2")[5],"red","dodgerblue4")
 
 boxplot(var_std~varia2,data=subset(resf,abs(var_std)<10))
 
+resf %>% group_by(ORDRE) %>% summarise(nb=length(unique(Speciesgen)))
+
 ######### FIGURE 3
 #calculate contributions in day/year
 resf[,contrib:=Estimate*trend]
@@ -133,6 +135,13 @@ xlab("")+ylab("Number of species")+ggtitle("b",subtitle="Evolution")+coord_carte
 obj=expand.grid(seq(min(contrib_tab$contrib_adapt)-0.05,max(contrib_tab$contrib_adapt)+0.05,0.005),seq(min(contrib_tab$contrib_plast)-0.05,max(contrib_tab$contrib_plast)+0.05,0.005))
 obj$value=obj[,1]+obj[,2]
 
+contrib_tab$gradient="co-gradient"
+contrib_tab$gradient[contrib_tab$Est.signi_adapt=="<0.05" & contrib_tab$Est.signi_plast=="<0.05" &
+sign(contrib_tab$contrib_plast)!=sign(contrib_tab$contrib_adapt)]="counter-gradient"
+contrib_tab$gradient[contrib_tab$Est.signi_adapt=="<0.05" & contrib_tab$Est.signi_plast==">0.05"]="zero or one mechanism significant only"
+contrib_tab$gradient[contrib_tab$Est.signi_adapt==">0.05" & contrib_tab$Est.signi_plast=="<0.05"]="zero or one mechanism significant only"
+contrib_tab$gradient[contrib_tab$Est.signi_adapt==">0.05" & contrib_tab$Est.signi_plast==">0.05"]="zero or one mechanism significant only"
+
 pl=ggplot(data=contrib_tab,aes(y=contrib_plast,x=contrib_adapt))+
 geom_raster(data=obj,aes(x=Var1,y=Var2,fill=value))+
 scale_fill_gradient2(name="Resulting\npheno. shift\n(day/year)")+
@@ -145,7 +154,8 @@ theme(panel.grid=element_blank(),strip.background = element_blank(),panel.border
 plot.title=element_text(size=14,face="bold"))+
 ylab("Contribution of phenotypic plasticity to phenological shifts (day/year)")+
 xlab("Contribution of evolution to phenological shifts (day/year)")+coord_fixed(ratio=1,expand=F)+ggtitle("c")+
-stat_cor(p.accuracy = 0.01, r.accuracy = 0.01,label.x=0.5,label.y=0.35)
+stat_cor(p.accuracy = 0.01, r.accuracy = 0.01,label.x=0.5,label.y=0.35)+
+scale_fill_manual(values=c("white","black"))
 
 
 haut=grid.arrange(pl1,pl2,ncol=2,bottom="Contribution to phenological shifts (day/year)",left="Number of species")
@@ -210,11 +220,12 @@ theme_bw()+theme(axis.line = element_line(colour = "black"),panel.grid.major = e
 panel.border = element_blank(),panel.background = element_blank(),
 plot.title=element_text(size=14,face="bold",hjust = 0),legend.position="right")+xlab("Temperature anomalies (°C)")+coord_cartesian(expand=F)+
 scale_y_continuous(name = "Predicted mean flight date (day of the year)")+
-scale_color_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+scale_fill_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+
+scale_color_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)],name="Predicted\nreaction norm")+scale_fill_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)],name="Predicted\nreaction norm")+
 labs(col="",fill="")+ggtitle("a")+
-geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+scale_shape_manual(values=c(21,24))+labs(shape="")+
-guides(fill="none")
-
+geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+
+scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+labs(shape="")+
+ guides(fill = guide_legend(order = 3,override.aes = list(linetype = 1)),color = guide_legend(order = 3,override.aes = list(linetype = 1,shape=NA)),
+ shape=guide_legend(order=4))
 ##### EXAMPLE 2
 sp="Andrena fulva_NA"
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
@@ -260,7 +271,8 @@ plot.title=element_text(size=14,face="bold",hjust = 0),legend.position="right")+
 scale_y_continuous(name = "Predicted mean flight date (day of the year)")+
 scale_color_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+scale_fill_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+
 labs(col="",fill="")+ggtitle("c")+
-geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+scale_shape_manual(values=c(21,24))+labs(shape="")+
+geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+
+scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+labs(shape="")+
  guides(fill = guide_legend(order = 3,override.aes = list(linetype = 1)),color = guide_legend(order = 3,override.aes = list(linetype = 1,shape=NA)),
  shape=guide_legend(order=4))
  
@@ -310,7 +322,8 @@ scale_y_continuous(name = "Predicted mean flight date (day of the year)")+
 scale_color_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)],name="Predicted\nreaction norm")+
 scale_fill_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)],name="Predicted\nreaction norm")+
 labs(col="",fill="")+ggtitle("b")+
-geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+labs(shape="")+
+geom_point(data=newdat,size=4,color="black",stroke = 2,aes(x=x,y=predicted,color=group2,fill=group2,shape=scenario))+
+scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+labs(shape="")+
  guides(fill = guide_legend(order = 3,override.aes = list(linetype = 1)),color = guide_legend(order = 3,override.aes = list(linetype = 1,shape=NA)),
  shape=guide_legend(order=4))
  
@@ -391,7 +404,7 @@ geom_ribbon(data=obj,aes(x=x,y=predicted,fill=group,ymin=conf.low,ymax=conf.high
 geom_line(data=obj,aes(x=x,y=predicted,color=group),size=1.2,linetype="dashed")+
 theme(panel.grid=element_blank(),strip.background = element_blank(),panel.border=element_blank(),axis.line = element_line(colour = "black"),
 plot.title=element_text(size=14,face="bold"))+ggtitle("d")+scale_color_manual(values=c("#3581B8","#FCB07E"))+
-scale_x_latitude()+scale_fill_manual(values=c("#3581B8","#FCB07E"))+scale_x_longitude(name="Average latitude",ticks =1)
+scale_x_latitude()+scale_fill_manual(values=c("#3581B8","#FCB07E"))+scale_x_longitude(name="Average longitude",ticks =1)
 
 grid.arrange(pl1,pl2,pl3,pl4,ncol=4,widths=c(1,1,1,1.2))
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
@@ -430,7 +443,7 @@ geom_ribbon(data=pre,aes(x=x,y=predicted,ymin=conf.low,ymax=conf.high),alpha=0.2
 geom_line(data=pre,aes(x=x,y=predicted),size=1,color="black")+
 theme_bw()+theme(axis.line = element_line(colour = "black"),panel.grid.major = element_blank(),panel.grid.minor = element_blank(),
 panel.border = element_blank(),panel.background = element_blank(),
-plot.title=element_text(size=14,face="bold",hjust = 0),legend.position="right")+xlab("Species mean flight date (day of the year))")+coord_cartesian(expand=F)+
+plot.title=element_text(size=14,face="bold",hjust = 0),legend.position="right")+xlab("Species mean flight date (day of the year)")+coord_cartesian(expand=F)+
 scale_y_continuous(name = "Contribution of evolution to phenological shifts (day/year)")+
 scale_color_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+scale_fill_manual(values=brewer.pal(8, "Blues")[c(3, 5, 8)])+
 labs(col="",fill="")+ggtitle("a")

@@ -116,45 +116,42 @@ form=as.formula(paste0("LayDate~(",liste$model[which.min(liste$AICc)],")*Year2+(
 model2=lmer(form,data=tab)
 summary(model2)
 
-adapt=data.frame(est=c("mean","lwr","upr"),varia=rep(c("1973-2016","1988-2016"),each=3),
-Ramakers=c(-3.91,-7.38,-0.44,-2.34,-4.20,-0.48),sametemp=c(rep(fixef(model)["Year2"],3)+
+adapt=data.frame(est=c("mean","lwr","upr"),varia=c("1988-2016"),
+Ramakers=c(-2.34,-4.20,-0.48),sametemp=c(fixef(model)["Year2"]+
 c(0,-1.96*coef(summary(model))["Year2","Std. Error"],1.96*coef(summary(model))["Year2","Std. Error"]))*
-rep(c(length(unique(tab$Year)),length(unique(tab$Year[tab$Year>=1988]))),each=3),
+length(unique(tab$Year[tab$Year>=1988])),
 difftemp=c(rep(fixef(model2)["Year2"],3)+c(0,-1.96*coef(summary(model2))["Year2","Std. Error"],
-1.96*coef(summary(model2))["Year2","Std. Error"]))*rep(c(length(unique(tab$Year)),length(unique(tab$Year[tab$Year>=1988]))),each=3))
+1.96*coef(summary(model2))["Year2","Std. Error"]))*length(unique(tab$Year[tab$Year>=1988])))
 adapt$type="evolution of the reaction norm intercept"
 
-plast=data.frame(est=c("mean","lwr","upr"),varia=rep(c("1973-2016","1988-2016"),each=3),
-Ramakers=c(-3.15,-4.36,-1.76,-3.28,-3.92,-2.68),sametemp=c(rep(fixef(model)["temp2"],3)+
-c(0,-1.96*coef(summary(model))["temp2","Std. Error"],1.96*coef(summary(model))["temp2","Std. Error"]),NA,NA,NA)*sd(tab$temp),
-difftemp=c(rep(fixef(model2)[paste(liste$model[which.min(liste$AICc)])],3)+
+plast=data.frame(est=c("mean","lwr","upr"),varia=c("1973-2016"),
+Ramakers=c(-3.28,-3.92,-2.68),sametemp=c(fixef(model)["temp2"]+
+c(0,-1.96*coef(summary(model))["temp2","Std. Error"],1.96*coef(summary(model))["temp2","Std. Error"]))*sd(tab$temp),
+difftemp=fixef(model2)[paste(liste$model[which.min(liste$AICc)])]+
 c(0,-1.96*coef(summary(model2))[paste(liste$model[which.min(liste$AICc)]),"Std. Error"],
-1.96*coef(summary(model2))[paste(liste$model[which.min(liste$AICc)]),"Std. Error"]),NA,NA,NA)*sd(tab[,liste$model[which.min(liste$AICc)]]))
+1.96*coef(summary(model2))[paste(liste$model[which.min(liste$AICc)]),"Std. Error"])*sd(tab[,liste$model[which.min(liste$AICc)]]))
 plast$type="plasticity"
 
-evolplast=data.frame(est=c("mean","lwr","upr"),varia=rep(c("1973-2016","1988-2016"),each=3),
-Ramakers=c(0.58,-2.10,3.31,-0.04,-0.09,0.02),sametemp=c(rep(fixef(model)["temp2:Year2"],3)+
+evolplast=data.frame(est=c("mean","lwr","upr"),varia=c("1988-2016"),
+Ramakers=c(-0.04,-0.09,0.02),sametemp=c(fixef(model)["temp2:Year2"]+
 c(0,-1.96*coef(summary(model),)["temp2:Year2","Std. Error"],1.96*coef(summary(model))["temp2:Year2","Std. Error"]))*
-sd(tab$temp)*rep(c(length(unique(tab$Year)),length(unique(tab$Year[tab$Year>=1988]))),each=3),
-difftemp=c(rep(fixef(model2)[paste0(liste$model[which.min(liste$AICc)],":Year2")],3)+
+sd(tab$temp)*length(unique(tab$Year[tab$Year>=1988])),
+difftemp=c(fixef(model2)[paste0(liste$model[which.min(liste$AICc)],":Year2")])+
 c(0,-1.96*coef(summary(model2))[paste0(liste$model[which.min(liste$AICc)],":Year2"),"Std. Error"],
-1.96*coef(summary(model2))[paste0(liste$model[which.min(liste$AICc)],":Year2"),"Std. Error"]))*
-sd(tab[,liste$model[which.min(liste$AICc)]])*rep(c(length(unique(tab$Year)),length(unique(tab$Year[tab$Year>=1988]))),each=3))
+1.96*coef(summary(model2))[paste0(liste$model[which.min(liste$AICc)],":Year2"),"Std. Error"])*
+sd(tab[,liste$model[which.min(liste$AICc)]])*length(unique(tab$Year[tab$Year>=1988])))
 evolplast$type="evolution of plasticity"
 
 b=rbind(adapt,plast,evolplast)
 b2=dcast(melt(b,id.vars=c("type","est","varia")),type+variable+varia~est)
 b2$variable=as.character(b2$variable)
-b2$variable[b2$variable=="Ramakers"]="Estimate from Ramakers et al.\n(predictions of breeder's equation)"
-b2$variable[b2$variable=="Estimate from Ramakers et al.\n(predictions of breeder's equation)" & b2$varia=="1973-2016"]="Estimate from Ramakers et al.\n(bivariate random regression model)"
+b2$variable[b2$variable=="Ramakers"]="Estimate from Ramakers et al."
 b2$variable[b2$variable=="sametemp"]="Our method applied with\nRamakers et al. temperature index"
 b2$variable[b2$variable=="difftemp"]="Our method applied while\nre-estimating the best temperature index"
-b2$variable=factor(b2$variable,levels=c("Estimate from Ramakers et al.\n(bivariate random regression model)",
-"Estimate from Ramakers et al.\n(predictions of breeder's equation)",
+b2$variable=factor(b2$variable,levels=c("Estimate from Ramakers et al.",
 "Our method applied with\nRamakers et al. temperature index",
 "Our method applied while\nre-estimating the best temperature index"))
 b2$varia[b2$type=="plasticity"]="1973-2016"
-
 
 pl1=ggplot(data=subset(b2,type=="evolution of the reaction norm intercept"),aes(x=variable,y=mean,color=varia))+
 geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
@@ -162,8 +159,8 @@ geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("a")+
 theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Evolution of the reaction norm intercept (days)")+
-coord_flip()+labs(color="Period on which changes are integrated:")+
-scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
+coord_flip()+labs(color="Period on which changes are estimated:")+
+scale_color_manual(values=c("black","grey"),drop=F,breaks=c("1988-2016","1973-2016"))+guides(colour = guide_legend(title.position="top"))
 
 pl2=ggplot(data=subset(b2,type=="plasticity"),aes(x=variable,y=mean,color=varia))+
 geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
@@ -172,7 +169,7 @@ theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Phenotypic plasticity to temperature (days/°C)")+
 coord_flip()+labs(color="Period used for estimation:")+
-scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
+scale_color_manual(values=c("grey"))+guides(colour = guide_legend(title.position="top"))
 
 pl3=ggplot(data=subset(b2,type=="evolution of plasticity"),aes(x=variable,y=mean,color=varia))+
 geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
@@ -180,12 +177,28 @@ geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("c")+
 theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
 axis.title.y=element_blank(),axis.text.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
 legend.title=element_text(size=10))+ylab("Evolution of phenotypic plasticity (days/°C)")+
-coord_flip()+labs(color="Period on which changes are integrated:")+
+coord_flip()+labs(color="Period on which changes are estimated:")+
 scale_color_manual(values=c("black","grey"))+guides(colour = guide_legend(title.position="top"))
 
-plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.7,1,1),align="h")
+pl4=ggplot(data=b2,aes(x=variable,y=mean,color=varia))+
+geom_hline(yintercept=0,linetype="dashed")+geom_point(size=4)+
+geom_errorbar(aes(ymin=lwr,ymax=upr),width=0,alpha=0.7)+theme_bw()+ggtitle("a")+
+theme(plot.title=element_text(size=14,face="bold"),panel.grid=element_blank(),
+axis.title.y=element_blank(),axis.title.x=element_text(size=10),legend.position="bottom",
+legend.title=element_text(size=10))+ylab("Evolution of the reaction norm intercept (days)")+
+coord_flip()+labs(color="Period on which changes are estimated:")+
+scale_color_manual(values=c("grey","black"),drop=F,breaks=c("1973-2016","1988-2016"))+guides(colour = guide_legend(title.position="top"))
+
+leg <- ggpubr::as_ggplot(cowplot::get_legend(pl4))
+pl1=pl1+theme(legend.position="none")
+pl2=pl2+theme(legend.position="none")
+pl3=pl3+theme(legend.position="none")
+blank=ggplot() + theme_void()
+
+
+plot_grid(pl1,pl2,pl3,blank,leg,blank,ncol=3,rel_widths=c(1.7,1,1),rel_heights=c(6,1),align="h")
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
 pdf("figureS5.pdf",height=4,width=12)
-plot_grid(pl1,pl2,pl3,ncol=3,rel_widths=c(1.8,1,1),align="h")
+plot_grid(pl1,pl2,pl3,blank,leg,blank,ncol=3,rel_widths=c(1.7,1,1),rel_heights=c(6,1),align="h")
 dev.off();

@@ -29,13 +29,23 @@ liste=liste %>% dplyr::group_by(Speciesgen) %>% dplyr::mutate(correlation=max(ab
 liste$nbit=liste$nb_annee
 liste$data_number=factor(liste$data_number,c("n = 500","n = 1000","n = 1500","n = 2500"))
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_simues")
+
+nbit_vec=c(25,30,35,40,45,50,55)
+nbdata_vec=c(500,1000,1500,2500)
+mechanisms=c("without_adapt","without_plast","without_evol_plast","total","without_evolution")
+setwd(dir="C:/Users/duchenne/Documents/plast_adaptation/data/resultats_simues")
+tabtab=expand.grid(nbdata_vec,nbit_vec,mechanisms)
+res2=NULL
+for(i in 1:nrow(tabtab)){
+nb_data=tabtab[i,1] 
+nbit=tabtab[i,2]  
+mecha=tabtab[i,3]
+sim=fread(paste("resultats_simulations_sans_evol_de_g_",nb_data,"_",mecha,"_",nbit,".txt",sep=""))
+sim$mechanism=as.character(sim$mechanism)
+sim$mechanism=as.character(mecha)
+res2=rbind(res2,sim)
+}
 library(plyr)
-res2b=fread("resultats_simulations_sans_g_evol_sans_plast_evol500.txt",header=T,sep="\t")
-res2c=fread("resultats_simulations_sans_g_evol_sans_plast_evol1000.txt",header=T,sep="\t")
-res2c2=fread("resultats_simulations_sans_g_evol_sans_plast_evol1500.txt",header=T,sep="\t")
-res2d=fread("resultats_simulations_sans_g_evol_sans_plast_evol2500.txt",header=T,sep="\t")
-res2=rbind(res2d,res2b,res2c,res2c2)
 res2$diffea=abs(res2$adapt-res2$t_adapt)
 res2$diffep=abs(res2$plast-res2$t_plast)
 res2$diffei=abs(res2$evol_plast-0)
@@ -53,7 +63,7 @@ theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),axis.title.x=element_blank(),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
 scale_fill_gradientn(colors=Blue2DarkRed18Steps,na.value="black",limits=c(0,max(b$diffea)))+
-labs(fill="Error in\nday/year")+ylab("")+ggtitle("a")+
+labs(fill="Error in\nday/year")+ylab("")+ggtitle("a - Evolution of reaction norm's elevation")+
 geom_point(data=liste,aes(x=correlation,y=nbit),size=1,col="black")+coord_cartesian(expand=F)
 
 b=summaryBy(diffep~correlation+nbit+data_number,data=subset(res2,correlation>=min(liste$correlation) & correlation<=1),
@@ -65,7 +75,7 @@ theme(panel.grid=element_blank(),strip.background=element_blank(),axis.title.x=e
 legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
 scale_fill_gradientn(colors=Blue2DarkRed18Steps,na.value="black",limits=c(0,max(b$diffep)))+
-labs(fill="Error in\nday/°C")+ylab("Number of years")+ggtitle("b")+
+labs(fill="Error in\nday/°C")+ylab("Number of years")+ggtitle("b - Phenotypic plasticity")+
 geom_point(data=liste,aes(x=correlation,y=nbit),size=1,col="black")+coord_cartesian(expand=F)
 
 
@@ -78,7 +88,7 @@ theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),,
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
 scale_fill_gradientn(colors=Blue2DarkRed18Steps,na.value="black",limits=c(0,max(b$diffei)))+
-labs(fill="Error in\nday/°C/year")+xlab("Time-temperature correlation")+ylab("")+ggtitle("c")+
+labs(fill="Error in\nday/°C/year")+xlab("Time-temperature correlation")+ylab("")+ggtitle("c - Evolution of phenotypic plasticity")+
 geom_point(data=liste,aes(x=correlation,y=nbit),size=1,col="black")+coord_cartesian(expand=F)
 
 cowplot::plot_grid(pl1,pl2,pl3,nrow=3,align = "v")
