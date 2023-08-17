@@ -47,8 +47,8 @@ geom_abline(intercept=0,slope=1,col="black",linetype="dashed")+
 theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
-ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution on\nthe reaction norm elevation (days/year)")+
-xlab("True value (from simulation) of evolution on the reaction norm elevation (days/year)")+
+ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution of\nthe reaction norm intercept (days/year)")+
+xlab("True value (from simulation) of evolution of the reaction norm intercept (days/year)")+
 geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="dashed")+
 labs(col="Nb. of years")
 
@@ -81,8 +81,8 @@ geom_abline(intercept=0,slope=1,col="black",linetype="dashed")+
 theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
-ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution on\nthe reaction norm elevation (days/year)")+
-xlab("True value (from simulation) of evolution on the reaction norm elevation (days/year)")+
+ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution of\nthe reaction norm intercept (days/year)")+
+xlab("True value (from simulation) of evolution of the reaction norm intercept (days/year)")+
 geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="dashed")+
 labs(col="Nb. of years")
 
@@ -103,8 +103,8 @@ geom_abline(intercept=0,slope=1,col="black",linetype="dashed")+
 theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
-ggtitle("c")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution on\nphenotypic plasticity (days/°C/year)")+
-xlab("True value (from simulation) of evolution on phenotypic plasticity (days/°C/year)")+
+ggtitle("c")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution of\nphenotypic plasticity (days/°C/year)")+
+xlab("True value (from simulation) of evolution of phenotypic plasticity (days/°C/year)")+
 geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="dashed")+
 labs(col="Nb. of years")
 
@@ -121,8 +121,8 @@ geom_abline(intercept=0,slope=1,col="black",linetype="dashed")+
 theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
-ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution on\nthe reaction norm elevation (days/year)")+
-xlab("True value (from simulation) of evolution on the reaction norm elevation (days/year)")+
+ggtitle("a")+scale_color_viridis(n.breaks =4)+ylab("Estimation of evolution of\nthe reaction norm intercept (days/year)")+
+xlab("True value (from simulation) of evolution of the reaction norm intercept (days/year)")+
 geom_hline(yintercept=0,linetype="dashed")+geom_vline(xintercept=0,linetype="dashed")+
 labs(col="Nb. of years")
 
