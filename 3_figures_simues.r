@@ -187,7 +187,7 @@ legend.position="right",strip.text=element_text(size=12),
 plot.title=element_text(size=14,face="bold"))+coord_cartesian(expand=F)+
 scale_fill_manual(values = rev(c('red', 'pink',"chartreuse3","lightgreen", 'dodgerblue3')),
 breaks=rev(c("false positive","false positive, but very small estimate","true positive","true negative","false negative")),name="")+
-ggtitle("c - without evolution of elevation",subtitle=expression(paste("[",Gaa == 0," , ", Gbb %~% U(0.5,2)," , ",b[t==0] %~% U(-6,6),"]")))+
+ggtitle("c - without evolution of intercept",subtitle=expression(paste("[",Gaa == 0," , ", Gbb %~% U(0.5,2)," , ",b[t==0] %~% U(-6,6),"]")))+
 ylab("Percentage of simulations")+xlab("Number of years")
 
 pl4=ggplot(data=subset(b,mechanism=="without_evol_plast"),aes(x=nbit,fill=cate,y=n))+geom_bar(stat="identity",position="fill")+facet_wrap(~data_number)+theme_bw()+

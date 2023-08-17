@@ -157,7 +157,6 @@ xlab("Contribution of evolution to phenological shifts (day/year)")+coord_fixed(
 stat_cor(p.accuracy = 0.01, r.accuracy = 0.01,label.x=0.5,label.y=0.35)+
 scale_fill_manual(values=c("white","black"))
 
-
 haut=grid.arrange(pl1,pl2,ncol=2,bottom="Contribution to phenological shifts (day/year)",left="Number of species")
 
 layout=rbind(c(1,1,1,1),c(3,3,3,4))
