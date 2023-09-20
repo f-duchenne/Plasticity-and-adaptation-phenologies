@@ -36,7 +36,7 @@ liste=subset(liste,nb_pre1990>=50 & nb_post1990>=500)
 vec=names(liste)[grep("temp",names(liste),fixed=T)]
 nb=liste[,c("Speciesgen","Species","FAMILLE","ORDRE","nb_pre1990","nb_post1990")]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
 resf=NULL
 lili=list.files()
 lili=lili[grep("_qual.txt",lili,invert=T)]
@@ -72,6 +72,19 @@ resf$Est.signi=">0.05"
 resf$Est.signi[resf$lwr>0]="<0.05"
 resf$Est.signi[resf$upr<0]="<0.05"
 resf$Est.signi=factor(resf$Est.signi,c(">0.05","<0.05"))
+
+subset(resf,!is.na(conv))
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+load(paste0("model_",gsub(" ","_","Triodia sylvina_NA",fixed=T),".RData"))
+
+#Unstandardize coeffs:
+resf$Estimate[grepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]=
+resf$Estimate[grepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]/
+resf$sd[grepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]
+resf$sde[grepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]=
+resf$sdegrepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]/
+resf$sd[grepl("temp_",resf$varia) | resf$varia %in% c("Annee2","Altitude")]
+
 
 coucou=c("magenta2",brewer.pal(5,"Set2")[5],"red","dodgerblue4")
 
@@ -180,24 +193,30 @@ years_to_pred=c(1960,1990,2010)
 sp="Abraxas sylvata_NA"
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
+bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
 varia=subset(dat,Speciesgen==sp)$varia
-moy=mean(bidon$Annee)
-vec=bidon$Annee
-bidon$Annee2=bidon$Annee-mean(bidon$Annee)
+bidon$Annee2=bidon$Annee
+scale_var=data.frame(varia=c(varia,"Annee2","Altitude"),moy=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,mean),sd=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,sd))
+bidon$Annee2=(bidon$Annee-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
+bidon$Altitude=(bidon$Altitude-scale_var$moy[scale_var$varia=="Altitude"])/scale_var$sd[scale_var$varia=="Altitude"]
+bidon[,paste(varia)]=as.data.table(apply(bidon[,varia,with=F],2,scale))
 bidon$Annee=bidon$Annee-1960
-ann_pre=years_to_pred-moy
+bidon$maille_slope=bidon$maille
+bidon$loc=paste(bidon$Longitude_10km,bidon$Latitude_10km,sep="_")
+bidon$period="pre1990"
+bidon$period[(bidon$Annee+1960)>=1990]="post1990"
+ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+#load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
-b=ggpredict(model,c("temp_75_165",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
-b$group2=as.factor(years_to_pred)
-
-newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,5)) %>%
+#predict positions for chosen years
+newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,(5/scale_var$sd[scale_var$varia=="Annee2"]))) %>%
 dplyr::summarise(temp_75_165=mean(temp_75_165),temp_285_315=mean(bidon$temp_285_315),Altitude=mean(bidon$Altitude),maille=NA,Annee=NA)
 names(newdat)[1]="Annee2"
-newdat=subset(newdat,Annee2 %in% plyr::round_any(c(years_to_pred-moy),5))
+newdat=subset(newdat,Annee2 %in% plyr::round_any(c(ann_pre),5/scale_var$sd[scale_var$varia=="Annee2"]))
 newdat$group2=as.factor(years_to_pred)
 newdat$x=newdat$temp_75_165
 newdat$predicted=predict(model,newdata=newdat,re.form=NA)
@@ -208,9 +227,17 @@ newdat2$predicted=predict(model,newdata=newdat2,re.form=NA)
 newdat2$scenario="without evolution"
 newdat$scenario="with evolution"
 newdat=rbind(newdat,newdat2[-1,])
+newdat$x=(newdat$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
+
+
+#predict reaction norms
+b=ggpredict(model,c("temp_75_165",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
+b$group2=as.factor(years_to_pred)
+b$x=(b$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
+
 
 pl1=ggplot()+
-geom_jitter(data=bidon,aes(x=temp_75_165,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.05)+
+geom_jitter(data=bidon_unscale,aes(x=temp_75_165,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.05)+
 scale_color_gradient(low=brewer.pal(8, "Blues")[c(2)],high=brewer.pal(9, "Blues")[9],name="Year of observation",breaks=c(1960,1980,2000))+
 new_scale_colour()+
 geom_ribbon(data=b,aes(x=x,y=predicted,color=group2,fill=group2,ymin=conf.low,ymax=conf.high),alpha=0.2,col=NA)+
@@ -229,24 +256,30 @@ scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+
 sp="Andrena fulva_NA"
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
+bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
 varia=subset(dat,Speciesgen==sp)$varia
-moy=mean(bidon$Annee)
-vec=bidon$Annee
-bidon$Annee2=bidon$Annee-mean(bidon$Annee)
+bidon$Annee2=bidon$Annee
+scale_var=data.frame(varia=c(varia,"Annee2","Altitude"),moy=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,mean),sd=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,sd))
+bidon$Annee2=(bidon$Annee-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
+bidon$Altitude=(bidon$Altitude-scale_var$moy[scale_var$varia=="Altitude"])/scale_var$sd[scale_var$varia=="Altitude"]
+bidon[,paste(varia)]=as.data.table(apply(bidon[,varia,with=F],2,scale))
 bidon$Annee=bidon$Annee-1960
-ann_pre=sort(unique(bidon$Annee2[vec %in%years_to_pred]))
+bidon$maille_slope=bidon$maille
+bidon$loc=paste(bidon$Longitude_10km,bidon$Latitude_10km,sep="_")
+bidon$period="pre1990"
+bidon$period[(bidon$Annee+1960)>=1990]="post1990"
+ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+#load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
-b=ggpredict(model,c("temp_30_120",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
-b$group2=as.factor(years_to_pred)
-
-newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,5)) %>%
+#predict positions for chosen years
+newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,5/scale_var$sd[scale_var$varia=="Annee2"])) %>%
 dplyr::summarise(temp_30_120=mean(temp_30_120),temp_165_195=mean(bidon$temp_165_195),Altitude=mean(bidon$Altitude),maille=NA,Annee=NA)
 names(newdat)[1]="Annee2"
-newdat=subset(newdat,Annee2 %in% plyr::round_any(c(years_to_pred-moy),5))
+newdat=subset(newdat,Annee2 %in% plyr::round_any(c(ann_pre),5/scale_var$sd[scale_var$varia=="Annee2"]))
 newdat$group2=as.factor(years_to_pred)
 newdat$x=newdat$temp_30_120
 newdat$predicted=predict(model,newdata=newdat,re.form=NA)
@@ -257,9 +290,16 @@ newdat2$predicted=predict(model,newdata=newdat2,re.form=NA)
 newdat2$scenario="without evolution"
 newdat$scenario="with evolution"
 newdat=rbind(newdat,newdat2[-1,])
+newdat$x=(newdat$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
+
+
+#predict reaction norms
+b=ggpredict(model,c("temp_30_120",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
+b$group2=as.factor(years_to_pred)
+b$x=(b$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
 
 pl2=ggplot()+
-geom_jitter(data=bidon,aes(x=temp_30_120,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.05)+
+geom_jitter(data=bidon_unscale,aes(x=temp_30_120,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.05)+
 scale_color_gradient(low=brewer.pal(8, "Blues")[c(2)],high=brewer.pal(9, "Blues")[9],name="Year of observation",breaks=c(1960,1980,2000))+
 new_scale_colour()+
 geom_ribbon(data=b,aes(x=x,y=predicted,color=group2,fill=group2,ymin=conf.low,ymax=conf.high),alpha=0.2,col=NA)+
@@ -279,24 +319,30 @@ scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+
 sp="Bombus vestalis_NA"
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
+bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
 varia=subset(dat,Speciesgen==sp)$varia
-moy=mean(bidon$Annee)
-vec=bidon$Annee
-bidon$Annee2=bidon$Annee-mean(bidon$Annee)
+bidon$Annee2=bidon$Annee
+scale_var=data.frame(varia=c(varia,"Annee2","Altitude"),moy=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,mean),sd=apply(bidon[,c(varia,"Annee2","Altitude"),with=F],2,sd))
+bidon$Annee2=(bidon$Annee-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
+bidon$Altitude=(bidon$Altitude-scale_var$moy[scale_var$varia=="Altitude"])/scale_var$sd[scale_var$varia=="Altitude"]
+bidon[,paste(varia)]=as.data.table(apply(bidon[,varia,with=F],2,scale))
 bidon$Annee=bidon$Annee-1960
-ann_pre=years_to_pred-moy
+bidon$maille_slope=bidon$maille
+bidon$loc=paste(bidon$Longitude_10km,bidon$Latitude_10km,sep="_")
+bidon$period="pre1990"
+bidon$period[(bidon$Annee+1960)>=1990]="post1990"
+ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
 setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats")
+#load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
-b=ggpredict(model,c("temp_30_120",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
-b$group2=as.factor(years_to_pred)
-
-newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,5)) %>%
+#predict positions for chosen years
+newdat=bidon %>% dplyr::group_by(plyr::round_any(Annee2,5/scale_var$sd[scale_var$varia=="Annee2"])) %>%
 dplyr::summarise(temp_30_120=mean(temp_30_120),temp_315_345=mean(bidon$temp_315_345),Altitude=mean(bidon$Altitude),maille=NA,Annee=NA)
 names(newdat)[1]="Annee2"
-newdat=subset(newdat,Annee2 %in% plyr::round_any(c(years_to_pred-moy),5))
+newdat=subset(newdat,Annee2 %in% plyr::round_any(ann_pre,5/scale_var$sd[scale_var$varia=="Annee2"]))
 newdat$group2=as.factor(years_to_pred)
 newdat$x=newdat$temp_30_120
 newdat$predicted=predict(model,newdata=newdat,re.form=NA)
@@ -307,9 +353,17 @@ newdat2$predicted=predict(model,newdata=newdat2,re.form=NA)
 newdat2$scenario="without evolution"
 newdat$scenario="with evolution"
 newdat=rbind(newdat,newdat2[-1,])
+newdat$x=(newdat$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
+
+
+#predict reaction norms
+b=ggpredict(model,c("temp_30_120",paste0("Annee2[",paste(ann_pre,collapse=","),"]")))
+b$group2=as.factor(years_to_pred)
+b$x=(b$x*scale_var$sd[scale_var$varia==names(newdat)[2]])+scale_var$moy[scale_var$varia==names(newdat)[2]]
+
 
 pl3=ggplot()+
-geom_jitter(data=bidon,aes(x=temp_30_120,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.02)+
+geom_jitter(data=bidon_unscale,aes(x=temp_30_120,y=Jour.de.collecte,color=Annee+1960),height=0,width=0.02)+
 scale_color_gradient(low=brewer.pal(8, "Blues")[c(2)],high=brewer.pal(9, "Blues")[9],name="Year of\nobservations",breaks=c(1960,1980,2000))+
 new_scale_colour()+
 geom_ribbon(data=b,aes(x=x,y=predicted,color=group2,fill=group2,ymin=conf.low,ymax=conf.high),alpha=0.2,col=NA)+
@@ -413,7 +467,7 @@ dev.off();
 
 obj=insight::get_variance(model)
 b=data.frame(varia=c("Taxonomic (random effects)","Saptio-temporal (fixed effects)","Residual"),value=c(obj$var.random,obj$var.fixed,obj$var.residual))
-contrib_tab$value=contrib_tab$value/sum(contrib_tab$value)
+b$value=b$value/sum(b$value)
 pl1=ggplot(data=b,aes(x=varia,y=value))+geom_bar(stat="identity",col="white")+theme_bw()+
 theme(panel.grid=element_blank(),strip.background = element_blank(),panel.border=element_blank(),axis.line = element_line(colour = "black"),
 plot.title=element_text(size=14,face="bold"),axis.title.x=element_blank())+ylab("Percentage of variance in phenotypic plasticity explained")+

@@ -91,10 +91,13 @@ bidon$resid=bidon$Jour.de.collecte-model$summary.fitted.values$mean[grep("APredi
 res_inla=as.data.frame(model$summary.fixed)
 res_inla$varia_inla=rownames(res_inla)
 
-
 f.s=formula(paste0("Jour.de.collecte~",paste(varia,collapse="+"),
 "+scale(Altitude)+Annee2+(1+",paste(varia,collapse="+"),"+Annee2|maille)+(1|Annee)"))
 model <-lmer(f.s, data = bidon)
+if(length(model@optinfo$conv$lme4$code)>0){
+obj=allFit(model)
+model=obj[which.min(sapply(summary(obj)$msg,length))][[1]]
+}
 
 setwd(dir="/home/duchenne/plast/resultats")
 save(model,file=paste0("model_",gsub(" ","_",liste$Speciesgen[i],fixed=T),".RData"))
@@ -114,12 +117,20 @@ res$Altitudemean=mean(bidon$Altitude2,na.rm=T)
 res$mfd=mean(bidon$Jour.de.collecte)
 res$nb_annee=length(unique(bidon$Annee))
 res$nbdata=nrow(bidon)
-bidon$Annee2=plyr::round_any(bidon$Annee,2)
 res$skew_pre1990=skewness(bidon$resid[bidon$period=="pre1990"])
 res$skew_post1990=skewness(bidon$resid[bidon$period=="post1990"])
 res$kurt_pre1990=kurtosis(bidon$resid[bidon$period=="pre1990"])
 res$kurt_post1990=kurtosis(bidon$resid[bidon$period=="post1990"])
+res$conv=if(length(model@optinfo$conv$lme4$code)>0){model@optinfo$conv$lme4$code}else{NA}
 
+
+res$longterm_mfd=NA
+res$longterm_mfd.se=NA
+
+bidon$Annee2=bidon$Annee2/10
+mod=lmer(Jour.de.collecte~scale(Altitude)+Annee2+(1+Annee2|maille), data = bidon)
+res$longterm_mfd=fixef(mod)[3]*10
+res$longterm_mfd.se=summary(mod)$coeff[3,2]*10
 
 resqual=as.data.frame(bidon %>% dplyr::group_by(Speciesgen,Species,FAMILLE,ORDRE,maille,ctr_lon,ctr_lat) %>%
 dplyr::summarise(n=length(unique(Annee))))
@@ -135,10 +146,12 @@ resqual=cbind(resqual,biche)
 res$trend=NA
 for(j in varia){
 formu=formula(paste0(j,"~Annee+(1+Annee|maille)"))
-data=subset(temp,Annee>=min(bidon$Annee2+1990) & Annee<=max(bidon$Annee2+1990) & maille %in% bidon$maille)
+data=subset(temp,Annee>=min(bidon$Annee+1960) & Annee<=max(bidon$Annee+1960) & maille %in% bidon$maille)
+data$Annee=(data$Annee-1990)/10
 mod <- lmer(formu,data=data)
-res$trend[res$varia==j]=fixef(mod)[2]
-resqual[,paste0(j,"_trend")]=ranef(mod)$maille$Annee
+res$trend[res$varia==j]=fixef(mod)[2]*10
+res$trend.se[res$varia==j]=summary(mod)$coeff[2,2]*10
+resqual[,paste0(j,"_trend")]=ranef(mod)$maille$Annee*10
 }
 
 
@@ -150,3 +163,5 @@ resqual=subset(resqual,n>=5)
 setwd(dir="/home/duchenne/plast/resultats")
 fwrite(resf,paste0(gsub(" ","_",liste$Speciesgen[i],fixed=T),".txt"),sep="\t")
 fwrite(resqual,paste0(gsub(" ","_",liste$Speciesgen[i],fixed=T),"_qual.txt"),sep="\t")
+
+save(model,file=paste0("model_",gsub(" ","_",liste$Speciesgen[i],fixed=T),".RData"))

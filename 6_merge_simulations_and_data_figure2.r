@@ -63,7 +63,7 @@ theme(panel.grid=element_blank(),strip.background=element_blank(),
 legend.position="right",strip.text=element_text(size=12),axis.title.x=element_blank(),
 plot.title=element_text(size=14,face="bold"))+facet_wrap(~data_number,ncol=4)+
 scale_fill_gradientn(colors=Blue2DarkRed18Steps,na.value="black",limits=c(0,max(b$diffea)))+
-labs(fill="Error in\nday/year")+ylab("")+ggtitle("a - Evolution of reaction norm's intercept")+
+labs(fill="Error in\nday/year")+ylab("")+ggtitle("a - Evolution of reaction norm intercept")+
 geom_point(data=liste,aes(x=correlation,y=nbit),size=1,col="black")+coord_cartesian(expand=F)
 
 b=summaryBy(diffep~correlation+nbit+data_number,data=subset(res2,correlation>=min(liste$correlation) & correlation<=1),
