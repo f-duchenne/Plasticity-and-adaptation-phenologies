@@ -30,13 +30,13 @@ library(ggtern)
 library(ggpubr)
 library(ggh4x)
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data")
 liste=fread("selec_temp_var_beta.txt",sep="\t")
 liste=subset(liste,nb_pre1990>=50 & nb_post1990>=500)
 vec=names(liste)[grep("temp",names(liste),fixed=T)]
 nb=liste[,c("Speciesgen","Species","FAMILLE","ORDRE","nb_pre1990","nb_post1990")]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data/resultats_2")
 resf=NULL
 lili=list.files()
 lili=lili[grep("_qual.txt",lili,invert=T)]
@@ -167,14 +167,14 @@ stat_cor(p.accuracy = 0.01, r.accuracy = 0.01,label.x=0.4,label.y=0.32)
 haut=grid.arrange(pl1,pl2,ncol=2,bottom="Contribution to phenological shifts (day/year)",left="Number of species")
 
 layout=rbind(c(1,1,1,1),c(3,3,3,4))
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 pdf("figure3.pdf",height=7,width=10)
 grid.arrange(haut,pl,ncol=1,heights=c(1,2.6))
 dev.off();
 
 ############## FIGURE 4
 #subset(resf,Est.signi==">0.05" & varia2=="Year effect")[,c("Speciesgen","FAMILLE","ORDRE","nbdata")]
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data")
 temp=fread("annual_mean_by_indice_and_by_point_mat.txt",sep="\t")
 
 dat=fread("selec_temp_var_beta.txt",sep="\t")
@@ -185,7 +185,7 @@ years_to_pred=c(1960,1990,2010)
 
 #### EXAMPLE 1
 sp="Abraxas sylvata_NA"
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
 bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
@@ -202,7 +202,7 @@ bidon$period="pre1990"
 bidon$period[(bidon$Annee+1960)>=1990]="post1990"
 ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data/resultats_2")
 #load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
@@ -248,7 +248,7 @@ scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+
  shape=guide_legend(order=4))
 ##### EXAMPLE 2
 sp="Andrena fulva_NA"
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
 bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
@@ -265,7 +265,7 @@ bidon$period="pre1990"
 bidon$period[(bidon$Annee+1960)>=1990]="post1990"
 ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data/resultats_2")
 #load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
@@ -311,7 +311,7 @@ scale_shape_manual(values=c(21,24),name="Estimated position\non reaction norm")+
  
 ##### EXAMPLE 3
 sp="Bombus vestalis_NA"
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data")
 bidon=fread(paste0("data_per_species/",sp,".txt"))
 bidon_unscale=bidon
 bidon=subset(bidon, !is.na(elev) & !is.na(temp_0_90))
@@ -328,7 +328,7 @@ bidon$period="pre1990"
 bidon$period[(bidon$Annee+1960)>=1990]="post1990"
 ann_pre=(years_to_pred-scale_var$moy[scale_var$varia=="Annee2"])/scale_var$sd[scale_var$varia=="Annee2"]
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation/data/resultats_2")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation/data/resultats_2")
 #load model
 load(paste0("model_",gsub(" ","_",sp,fixed=T),".RData"))
 
@@ -381,7 +381,7 @@ pl3=pl3+theme(legend.position="none")
 
 plot_grid(pl1,pl2,pl3,leg,align="hv",ncol=4,rel_widths=c(1,1,1,0.4))
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 pdf("figure4.pdf",height=4,width=12)
 plot_grid(pl1,pl3,pl2,leg,align="hv",ncol=4,rel_widths=c(1,1,1,0.5))
 dev.off();
@@ -454,7 +454,7 @@ plot.title=element_text(size=14,face="bold"))+ggtitle("d")+scale_color_manual(va
 scale_x_latitude()+scale_fill_manual(values=c("#3581B8","#FCB07E"))+scale_x_longitude(name="Average longitude",ticks =1)
 
 grid.arrange(pl1,pl2,pl3,pl4,ncol=4,widths=c(1,1,1,1.2))
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 png("figure_S8.png",height=600,width=1600,res=120)
 grid.arrange(pl1,pl2,pl3,pl4,ncol=4,widths=c(1,1,1,1.2))
 dev.off();
@@ -516,7 +516,7 @@ theme(strip.background = element_blank(),panel.border=element_blank(),panel.grid
 plot.title=element_text(size=14,face="bold"),legend.position="none")+ylab("Deviation from average in evolution")+scale_colour_colorblind()+xlab("Taxonomic order")
 
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 pdf("figure5.pdf",height=5,width=12)
 plot_grid(pl1,pl2,pl3,ncol=3,align="h")
 dev.off();
@@ -556,7 +556,7 @@ ylab("Phenotypic plasticity estimates from LMER model (day/°C)")+xlab("Phenotyp
 coord_cartesian(expand=T)+ggtitle("b")
 
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 png("figure_S6.png",height=700,width=1200,res=120)
 grid.arrange(pl1,pl2,ncol=2)
 dev.off();
@@ -589,7 +589,7 @@ coord_cartesian(expand=F)+ggtitle("b")+stat_cor(p.accuracy = 0.01, r.accuracy = 
 
 plot_grid(pl1,pl2,pl3,align="hv",ncol=3,rel_widths=c(1.2,1,1))
 
-setwd(dir="C:/Users/Duchenne/Documents/plast_adaptation")
+setwd(dir="C:/Users/anonym/Documents/plast_adaptation")
 png("figure_S11.png",height=700,width=1200,res=120)
 plot_grid(pl1,pl2,align="hv",ncol=2)
 dev.off();
